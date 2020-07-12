@@ -6,6 +6,6 @@ I believe in good people, curiosity & hard work.
 
 Have a good day!
 
---
-Constantine Mureev
+--  
+Constantine Mureev  
 [mureev.com](https://mureev.com/)
