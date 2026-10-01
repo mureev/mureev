@@ -1,0 +1,34 @@
+# Constantine Mureev
+
+> Personal site of Constantine Mureev — engineering leader shaping fintech at
+> Renmoney, based in Yoshkar-Ola, Russia. The site itself is an interactive
+> terminal, hand-rolled in vanilla JavaScript with zero runtime dependencies.
+
+You are reading the briefing meant for agents. The human version of this page
+boots into a terminal at https://mureev.com/ — the facts are the same.
+
+## Who
+
+- Constantine Mureev (Константин Муреев) — engineering leader.
+- Builds high-performing teams; believes in good people, curiosity & hard work.
+- Currently shaping fintech at Renmoney (https://renmoney.com).
+- In software since September 2009; leading teams since 2012.
+- Based in Yoshkar-Ola, Russia (UTC+3). Russian native, English bilingual.
+
+## Contact
+
+- Email: constantine@mureev.com
+- LinkedIn: https://www.linkedin.com/in/mureev/
+- Telegram: https://t.me/mureev
+- Messenger: https://m.me/mureev
+- GitHub: https://github.com/mureev
+
+## Documents
+
+- [CV, English (PDF)](https://mureev.com/assets/CV/Constantine%20Mureev.pdf)
+- [CV, Russian (PDF)](https://mureev.com/assets/CV/%D0%9A%D0%BE%D0%BD%D1%81%D1%82%D0%B0%D0%BD%D1%82%D0%B8%D0%BD%20%D0%9C%D1%83%D1%80%D0%B5%D0%B5%D0%B2.pdf)
+
+## Colophon
+
+The terminal is written by hand — no frameworks, no build step, one
+self-contained HTML file whose source is documented for readers like you.

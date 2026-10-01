@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<!-- mureev.com — 5xx. Even segfaults are on-brand. -->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="color-scheme" content="dark">
+    <meta name="robots" content="noindex">
+    <title>Error — mureev.com</title>
+    <style>
+        :root {
+            --bg: #0a0e0b; --fg: #34ff6d; --fg-dim: rgba(52, 255, 109, .55); --fg-hi: #e0ffe9;
+        }
+        * { box-sizing: border-box; }
+        html { height: 100%; }
+        body {
+            margin: 0; min-height: 100%;
+            background: var(--bg); color: var(--fg);
+            font: 400 18px/1.5 ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+            text-shadow: 0 0 6px rgba(52, 255, 109, .38);
+            padding: clamp(14px, 3vw, 34px);
+        }
+        @media (max-width: 768px) { body { font-size: 15px; } }
+        ::selection { background: var(--fg); color: var(--bg); text-shadow: none; }
+        a { color: var(--fg-hi); text-decoration: underline; text-underline-offset: 3px; }
+        a:hover { background: var(--fg); color: var(--bg); text-shadow: none; }
+        pre { margin: 0 0 1.5em; font: inherit; line-height: 1.2; color: var(--fg-hi); font-size: clamp(8px, 2.9vw, 16px); }
+        p { margin: 0; min-height: 1.5em; white-space: pre-wrap; }
+        .ps1 { color: var(--fg-dim); } .dim { color: var(--fg-dim); } .hi { color: var(--fg-hi); }
+        .cursor {
+            display: inline-block; width: .62em; height: 1.15em;
+            background: var(--fg); vertical-align: text-bottom;
+            animation: blink 1.1s steps(1) infinite;
+        }
+        @keyframes blink { 50% { opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) { .cursor { animation: none; } }
+        #fx {
+            position: fixed; inset: 0; pointer-events: none;
+            background: repeating-linear-gradient(0deg, rgba(0,0,0,.08) 0 1px, transparent 1px 3px);
+        }
+        #fx::after {
+            content: ""; position: absolute; inset: 0;
+            background: radial-gradient(ellipse at center, transparent 58%, rgba(0,0,0,.32) 100%);
+        }
+    </style>
+</head>
+<body>
+    <div id="fx" aria-hidden="true"></div>
+    <pre aria-hidden="true">
+ ██████╗███╗   ███╗
+██╔════╝████╗ ████║
+██║     ██╔████╔██║
+██║     ██║╚██╔╝██║
+╚██████╗██║ ╚═╝ ██║
+ ╚═════╝╚═╝     ╚═╝</pre>
+    <p><span class="ps1">constantine@mureev.com:~$ </span>./serve-page</p>
+    <p><span class="hi">csh: segmentation fault</span>&nbsp;&nbsp;(core dumped)</p>
+    <p>&nbsp;</p>
+    <p class="dim">Something broke on my side — not yours. Give it a minute,</p>
+    <p class="dim">then head back to <a href="https://mureev.com/">mureev.com</a>.</p>
+    <p>&nbsp;</p>
+    <p><span class="ps1">constantine@mureev.com:~$ </span><span class="cursor"></span></p>
+</body>
+</html>

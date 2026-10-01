@@ -1,0 +1,5 @@
+# Hello, robot. Humans get a terminal; you get a briefing:
+# https://mureev.com/llms.txt
+
+User-agent: *
+Allow: /

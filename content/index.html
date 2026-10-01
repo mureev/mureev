@@ -1,0 +1,805 @@
+<!DOCTYPE html>
+<!--
+     mureev.com — a terminal, hand-rolled.
+
+     No jQuery. No frameworks. No build step. No runtime dependencies.
+     One file, written to be read: View Source *is* the site.
+
+     To the human reading this: welcome. It's all here — take your time.
+
+     Written by AI agents under close human direction — argued over, tested,
+     and rolled back once when it overreached. The maintainer contract is
+     AGENTS.md in the repo (github.com/mureev/mureev); agents crawling
+     the site have a briefing at /llms.txt.
+
+     Architecture: functional core, imperative shell. The pure logic between
+     the @core markers below runs headless in the unit suite; the DOM adapter
+     wraps around it. `npm test` runs both suites. Change the core — change
+     a test.
+-->
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
+    <meta name="color-scheme" content="dark">
+    <meta name="theme-color" content="#0a0e0b">
+
+    <title>Constantine Mureev — Engineering Leader</title>
+    <meta name="description" content="Personal site of Constantine Mureev — engineering leader shaping fintech at Renmoney. Yoshkar-Ola, Russia. Boots straight into a terminal; type help.">
+    <link rel="canonical" href="https://mureev.com/">
+    <!-- Favicon: hand-written SVG first (the cursor blinks in Firefox tabs),
+         pixel-tuned ICO for everyone else, PNG for iOS home screens. -->
+    <link rel="icon" href="/favicon.svg" type="image/svg+xml">
+    <link rel="icon" href="/favicon.ico" sizes="48x48 32x32 16x16">
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+
+    <!-- Social previews -->
+    <meta property="og:type" content="profile">
+    <meta property="og:site_name" content="mureev.com">
+    <meta property="og:title" content="Constantine Mureev — Engineering Leader">
+    <meta property="og:description" content="Engineering leader shaping fintech at Renmoney. The site is a terminal — hand-rolled, zero dependencies. Type help.">
+    <meta property="og:url" content="https://mureev.com/">
+    <meta property="og:image" content="https://mureev.com/assets/og.png">
+    <meta property="og:image:width" content="1200">
+    <meta property="og:image:height" content="630">
+    <meta property="og:image:alt" content="A green phosphor terminal: constantine@mureev.com:~$ whoami — Constantine Mureev">
+    <meta name="twitter:card" content="summary_large_image">
+
+    <!-- Who this is, for machines that ask politely -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Person",
+      "name": "Constantine Mureev",
+      "alternateName": "Константин Муреев",
+      "url": "https://mureev.com/",
+      "email": "mailto:constantine@mureev.com",
+      "jobTitle": "Head of Engineering",
+      "worksFor": { "@type": "Organization", "name": "Renmoney", "url": "https://renmoney.com" },
+      "address": { "@type": "PostalAddress", "addressLocality": "Yoshkar-Ola", "addressCountry": "RU" },
+      "sameAs": [
+        "https://www.linkedin.com/in/mureev/",
+        "https://t.me/mureev",
+        "https://m.me/mureev",
+        "https://github.com/mureev"
+      ]
+    }
+    </script>
+
+    <script>
+        /* Runs before first paint: mark JS as alive (hides the static
+           fallback) and restore a saved theme without a color flash. */
+        document.documentElement.classList.add('js');
+        try {
+            var t = localStorage.getItem('mureev:theme');
+            if (t) document.documentElement.setAttribute('data-theme', t);
+        } catch (e) { /* private mode — default theme it is */ }
+    </script>
+
+    <style>
+        /* ---------------------------------------------------------------
+           Phosphor. Default theme is green; amber/mono/crt/flat via the
+           `theme` command (persisted in localStorage when allowed).
+           Themes are pure CSS: one data-theme attribute on <html>, zero
+           JS involvement beyond setting it.
+           --------------------------------------------------------------- */
+        :root {
+            --bg:      #0a0e0b;
+            --fg:      #34ff6d;
+            --fg-dim:  rgba(52, 255, 109, .55);
+            --fg-hi:   #e0ffe9;
+            --glow:    0 0 6px rgba(52, 255, 109, .38);
+            --scan:    .08;             /* scanline opacity */
+            --mono:    ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
+        }
+        html[data-theme="amber"] {
+            --bg: #0e0a04; --fg: #ffb000; --fg-dim: rgba(255, 176, 0, .55);
+            --fg-hi: #ffe9c4; --glow: 0 0 6px rgba(255, 176, 0, .38);
+        }
+        html[data-theme="mono"] {
+            --bg: #050505; --fg: #d8d8d8; --fg-dim: rgba(216, 216, 216, .5);
+            --fg-hi: #ffffff; --glow: 0 0 5px rgba(255, 255, 255, .22);
+        }
+        html[data-theme="crt"] {
+            --scan: .22;
+        }
+        html[data-theme="flat"] {
+            --bg: #000000; --fg: #d8d8d8; --fg-dim: rgba(216, 216, 216, .5);
+            --fg-hi: #ffffff; --glow: none; --scan: 0;
+        }
+
+        * { box-sizing: border-box; }
+        html { height: 100%; }
+        body {
+            margin: 0; min-height: 100%;
+            background: var(--bg); color: var(--fg);
+            font: 400 18px/1.5 var(--mono);
+            text-shadow: var(--glow);
+            overflow-wrap: break-word;
+        }
+        @media (max-width: 768px) { body { font-size: 15px; } }
+
+        ::selection { background: var(--fg); color: var(--bg); text-shadow: none; }
+
+        a { color: var(--fg-hi); text-decoration: underline; text-underline-offset: 3px; }
+        a:hover, .cmd:hover { background: var(--fg); color: var(--bg); text-shadow: none; }
+
+        .hi   { color: var(--fg-hi); }
+        .dim  { color: var(--fg-dim); }
+        .err  { color: var(--fg-hi); }
+        .ps1  { color: var(--fg-dim); }
+        .cmd  { color: var(--fg-hi); text-decoration: underline dotted; text-underline-offset: 3px; cursor: pointer; }
+
+        /* ---- the screen ---- */
+        #term { display: none; }
+        .js #term { display: block; padding: clamp(14px, 3vw, 34px); max-width: 1100px; }
+
+        #out .ln, #row { white-space: pre-wrap; word-break: break-word; min-height: 1.5em; }
+        pre {
+            margin: 0; font: inherit; line-height: 1.2;
+            white-space: pre; overflow-x: auto;
+        }
+        pre.logo { color: var(--fg-hi); font-size: clamp(8px, 2.9vw, 16px); }
+
+        #cursor {
+            background: var(--fg); color: var(--bg);
+            text-shadow: none; box-shadow: var(--glow);
+            animation: blink 1.1s steps(1) infinite;
+        }
+        @keyframes blink { 50% { background: transparent; color: var(--fg); } }
+
+        /* neofetch */
+        .neo { display: flex; gap: 3ch; align-items: flex-start; flex-wrap: wrap; margin: .4em 0; }
+        .neo pre { line-height: 1.35; }
+        .sw { display: inline-block; width: 2.2ch; height: 1em; vertical-align: text-bottom; }
+
+        /* the hidden keyboard sink — see THE ONE CLEVER TRICK in the script */
+        #kbd {
+            position: fixed; left: 0; bottom: 0;
+            width: 2px; height: 2px;
+            font-size: 16px;                   /* stops iOS zoom-on-focus */
+            opacity: 0; border: 0; padding: 0; margin: 0;
+            resize: none; outline: none;
+            background: transparent; color: transparent; caret-color: transparent;
+        }
+
+        /* ---- CRT glass: scanlines + vignette overlay ---- */
+        #fx {
+            position: fixed; inset: 0; z-index: 9; pointer-events: none;
+            background:
+                repeating-linear-gradient(0deg,
+                    rgba(0, 0, 0, var(--scan)) 0 1px, transparent 1px 3px);
+        }
+        #fx::after {
+            content: ""; position: absolute; inset: 0;
+            background: radial-gradient(ellipse at center,
+                transparent 58%, rgba(0, 0, 0, .32) 100%);
+        }
+        /* full-retro extras: flicker + a sweeping scan band, crt theme only */
+        html[data-theme="crt"] #fx { animation: flicker 4s infinite; }
+        html[data-theme="crt"] #fx::before {
+            content: ""; position: absolute; left: 0; right: 0; height: 22vh;
+            background: linear-gradient(180deg, transparent,
+                rgba(255, 255, 255, .045), transparent);
+            animation: sweep 7s linear infinite;
+        }
+        @keyframes flicker {
+            0%, 100% { opacity: 1; } 92% { opacity: 1; }
+            93% { opacity: .82; } 94% { opacity: 1; } 97% { opacity: .93; }
+        }
+        @keyframes sweep { 0% { top: -25%; } 100% { top: 115%; } }
+        html[data-theme="flat"] #fx { display: none; }
+
+        @media (prefers-reduced-motion: reduce) {
+            #cursor { animation: none; }
+            #fx, #fx::before { animation: none !important; }
+        }
+
+        /* ---- no-JS fallback: the terminal, pre-recorded ---- */
+        #fallback { padding: clamp(14px, 3vw, 34px); max-width: 1100px; }
+        .js #fallback { display: none; }
+        #fallback h1 { font: inherit; margin: 0; min-height: 1.5em; }
+        #fallback p, #fallback ul { margin: 0; min-height: 1.5em; }
+        #fallback ul { list-style: none; padding: 0; }
+        #fallback .gap { height: 1.5em; }
+    </style>
+</head>
+
+<body>
+    <div id="fx" aria-hidden="true"></div>
+
+    <!-- No JavaScript? No problem. Same facts, pre-rendered as a finished
+         session. Crawlers: /llms.txt is the short version, made for you. -->
+    <main id="fallback">
+        <pre class="logo" aria-hidden="true">
+ ██████╗███╗   ███╗
+██╔════╝████╗ ████║
+██║     ██╔████╔██║
+██║     ██║╚██╔╝██║
+╚██████╗██║ ╚═╝ ██║
+ ╚═════╝╚═╝     ╚═╝</pre>
+        <div class="gap"></div>
+        <p><span class="ps1">constantine@mureev.com:~$ </span>whoami</p>
+        <h1>Constantine Mureev</h1>
+        <p>Engineering leader who builds high-performing teams. Shaping fintech at
+           <a href="https://renmoney.com">Renmoney</a>. Based in Yoshkar-Ola, Russia.</p>
+        <div class="gap"></div>
+        <p><span class="ps1">constantine@mureev.com:~$ </span>contacts</p>
+        <ul>
+            <li><a href="mailto:constantine@mureev.com">constantine@mureev.com</a></li>
+            <li><a href="https://www.linkedin.com/in/mureev/">LinkedIn</a> ·
+                <a href="https://t.me/mureev">Telegram</a> ·
+                <a href="https://m.me/mureev">Messenger</a></li>
+        </ul>
+        <div class="gap"></div>
+        <p><span class="ps1">constantine@mureev.com:~$ </span>cv</p>
+        <ul>
+            <li><a href="https://mureev.com/assets/CV/Constantine%20Mureev.pdf">CV — English (PDF)</a> ·
+                <a href="https://mureev.com/assets/CV/%D0%9A%D0%BE%D0%BD%D1%81%D1%82%D0%B0%D0%BD%D1%82%D0%B8%D0%BD%20%D0%9C%D1%83%D1%80%D0%B5%D0%B5%D0%B2.pdf">CV — Russian (PDF)</a></li>
+        </ul>
+        <div class="gap"></div>
+        <p class="dim">// JavaScript is off — the interactive terminal needs it. The facts above don't.</p>
+    </main>
+
+    <!-- The terminal. #out is the scrollback; #row is the live input line,
+         mirrored from the hidden textarea below. -->
+    <div id="term" role="application" aria-label="Interactive terminal — Constantine Mureev">
+        <div id="out" aria-live="polite"></div>
+        <div id="row"><span class="ps1" id="ps1"></span><span id="pre"></span><span id="cursor">&nbsp;</span><span id="post"></span></div>
+    </div>
+
+    <textarea id="kbd" autocapitalize="off" autocomplete="off" spellcheck="false"
+              enterkeyhint="go" aria-label="Terminal input"></textarea>
+
+    <script>
+    'use strict';
+    /* =====================================================================
+       csh — the Constantine shell — v3.0.0
+
+       Hand-written vanilla JS. Two layers, one file:
+
+         CORE   pure logic — parsing, history, completion, the command
+                registry. Commands return *descriptions* of output (Blocks),
+                never DOM. No document, no window, no clock of its own.
+                Runs headless in test/unit.test.js via the @core markers.
+
+         SHELL  the imperative rind — renders Blocks into DOM, mirrors the
+                keyboard sink into the prompt row, performs effects
+                (theme swap, scroll, boot typing).
+
+       Data flow, the whole thing:
+
+           keystrokes → #kbd → exec(raw) → dispatch(raw, ctx) → Block[]
+                                              │ (pure)
+                                              ▼
+                                     applyBlocks → DOM
+       ===================================================================== */
+
+    /* =====================================================================
+       CORE — pure. The unit suite extracts everything between the @core
+       markers and runs it in a bare node:vm. If you add DOM access in
+       here, the suite fails — on purpose.
+       ===================================================================== */
+    /* @core-start */
+
+    const VERSION = '3.1.0';
+    const PS1     = 'constantine@mureev.com:~$ ';
+    const THEMES  = ['green', 'amber', 'mono', 'crt', 'flat'];
+    const LOGO    = [
+        ' ██████╗███╗   ███╗',
+        '██╔════╝████╗ ████║',
+        '██║     ██╔████╔██║',
+        '██║     ██║╚██╔╝██║',
+        '╚██████╗██║ ╚═╝ ██║',
+        ' ╚═════╝╚═╝     ╚═╝'
+    ].join('\n');
+
+    /** Every external URL in one place — content changes shouldn't require
+        spelunking through command bodies. */
+    const LINKS = {
+        email:     'mailto:constantine@mureev.com',
+        linkedin:  'https://www.linkedin.com/in/mureev/',
+        telegram:  'https://t.me/mureev',
+        messenger: 'https://m.me/mureev',
+        renmoney:  'https://renmoney.com',
+        cvEn:      'https://mureev.com/assets/CV/Constantine%20Mureev.pdf',
+        cvRu:      'https://mureev.com/assets/CV/%D0%9A%D0%BE%D0%BD%D1%81%D1%82%D0%B0%D0%BD%D1%82%D0%B8%D0%BD%20%D0%9C%D1%83%D1%80%D0%B5%D0%B5%D0%B2.pdf',
+        gif:       'https://media1.giphy.com/media/mQI2sfO7U7MOcxoPdn/giphy.gif?cid=4fcb451e614o7scx9x7rm6v3ivvw5pxrsuxa0gzl69ygffbu&rid=giphy.gif&ct=s'
+    };
+
+    /* Output vocabulary — the only shapes a command may produce.
+       Part  = string                       plain text
+             | { t, c }                     styled text  (c: css class)
+             | { t, a }                     link         (a: href)
+             | { t, cmd }                   clickable command
+       Block = { ln: Part[] }               one output line
+             | { pre: string, cls? }        preformatted block
+             | { neo: SpecSheet }           the neofetch card (data only)
+             | { gif: {src, w, alt} }       an image
+             | { clear: true }              wipe the scrollback
+             | { theme: string }            switch + persist a theme      */
+
+    /** The boot greeting — content, not behavior, so it lives in CORE.
+        The copy is Constantine's voice. Don't "improve" it. */
+    const GREETING = [
+        [],
+        ["G'day, I'm Constantine Mureev."],
+        [],
+        ['Engineering leader who builds high-performing teams 🚀'],
+        ['Shaping fintech at ', { t: 'Renmoney', a: LINKS.renmoney }, ' (based in Yoshkar-Ola, Russia).'],
+        ['I believe in good people, curiosity & hard work.'],
+        ['Ready to chat?'],
+        [],
+        ['Type ', { t: 'help', cmd: 'help' }, ' for commands.']
+    ];
+
+    /** @param {string} raw @returns {string[]} argv, shell-style */
+    function parse(raw) {
+        return raw.trim().split(/\s+/).filter(Boolean);
+    }
+
+    /** Career clock, anchored to Sep 1, 2009 — the first paid line of code.
+        PDFs go stale; functions don't. When the CV and this function
+        disagree, believe the function.
+        @param {Date} now  injected for testability — the core owns no clock
+        @returns {{y: number, m: number}} full years and leftover months   */
+    function tenure(now) {
+        const months = (now.getFullYear() - 2009) * 12 + now.getMonth() - 8;
+        return { y: Math.floor(months / 12), m: months % 12 };
+    }
+
+    /** @param {Date} now @returns {string} HH:MM, zero-padded */
+    function clock(now) {
+        return String(now.getHours()).padStart(2, '0') + ':' +
+               String(now.getMinutes()).padStart(2, '0');
+    }
+
+    /** Command history with the classic readline contract: Up walks back,
+        Down walks forward, and the line you were typing ("live") is stashed
+        on first Up and restored when you walk past the newest entry.
+        Consecutive duplicates collapse; capacity is bounded.              */
+    class Hist {
+        constructor(cap = 50) { this.cap = cap; this.items = []; this.idx = 0; this.live = ''; }
+        /** Record an executed line (empty lines ignored) and reset the walk. */
+        push(v) {
+            v = v.trim();
+            if (v && v !== this.items[this.items.length - 1]) this.items.push(v);
+            if (this.items.length > this.cap) this.items.shift();
+            this.reset();
+        }
+        reset() { this.idx = this.items.length; this.live = ''; }
+        /** @param {string} current  the in-progress line, stashed on entry */
+        prev(current) {
+            if (!this.items.length || this.idx === 0) return this.items[0] ?? null;
+            if (this.idx === this.items.length) this.live = current;
+            return this.items[--this.idx];
+        }
+        next() {
+            if (this.idx >= this.items.length) return null;
+            this.idx++;
+            return this.idx === this.items.length ? this.live : this.items[this.idx];
+        }
+    }
+
+    /** Tab completion over command names — and over theme names when the
+        line starts with `theme `. Pure: returns what *should* happen.
+        @returns {{set: string} | {list: string[]} | null}                 */
+    function complete(value, names) {
+        const words = value.split(/\s+/);
+        let pool = null, prefix = '';
+        if (words.length === 1) { pool = names; prefix = words[0]; }
+        else if (words[0] === 'theme' && words.length === 2) { pool = THEMES; prefix = words[1]; }
+        if (!pool) return null;
+        const m = pool.filter((c) => c.startsWith(prefix.toLowerCase()));
+        if (m.length === 1) return { set: value.slice(0, value.length - prefix.length) + m[0] + ' ' };
+        if (m.length > 1 && prefix) return { list: m };
+        return null;
+    }
+
+    /** The neofetch card as data. The shell decides pixels; this decides
+        facts. ctx carries the clock and current theme (injected — see
+        dispatch). @returns {{title, fields, palette}}                     */
+    function specsheet(ctx) {
+        const t = tenure(ctx.now());
+        return {
+            title: 'constantine@mureev.com',
+            fields: [
+                ['Name',     'Constantine Mureev'],
+                ['Role',     'Head of Engineering'],
+                ['Company',  [{ t: 'Renmoney', a: LINKS.renmoney }, ' — fintech']],
+                ['Location', 'Yoshkar-Ola, Russia (UTC+3)'],
+                ['Uptime',   `${t.y}y ${t.m}m in software`],
+                ['Kernel',   'good people · curiosity · hard work'],
+                ['Shell',    'csh — the Constantine shell'],
+                ['Langs',    'Russian (native) · English (bilingual)'],
+                ['Contact',  [{ t: 'constantine@mureev.com', a: LINKS.email }]]
+            ],
+            palette: ['#555', '#999', '#ddd', 'var(--fg-dim)', 'var(--fg)', 'var(--fg-hi)']
+        };
+    }
+
+    /* -----------------------------------------------------------------
+       The registry. Every command: { d: one-line description,
+       run(arg, ctx) → Block[] }. Commands are pure — they *describe*
+       output; the shell performs it. That's why the unit suite can
+       assert on every command without a browser.
+
+       Scope note (see AGENTS.md): the visible command set is a decision,
+       not an accident. The owner declined a deeper easter-egg drawer —
+       don't add commands without his sign-off.
+       ----------------------------------------------------------------- */
+    const COMMANDS = {
+        help: {
+            d: 'this list',
+            run: () => Object.entries(COMMANDS).map(([name, c]) =>
+                ({ ln: [{ t: name.padEnd(14), cmd: name }, { t: c.d, c: 'dim' }] }))
+        },
+        about: {
+            d: 'who I am',
+            run: () => [{ ln: ['Engineering leader passionate about building teams, fintech, and great coffee. Based in Yoshkar-Ola, Russia.'] }]
+        },
+        contacts: {
+            d: 'how to reach me',
+            run: () => [{ ln: ['Email me at ', { t: 'constantine@mureev.com', a: LINKS.email },
+                ', connect on ', { t: 'LinkedIn', a: LINKS.linkedin },
+                ', or IM me in ', { t: 'Telegram', a: LINKS.telegram },
+                ' and ', { t: 'Messenger', a: LINKS.messenger }] }]
+        },
+        cv: {
+            d: 'the PDF, in EN and RU',
+            run: () => [{ ln: ['Open ', { t: 'PDF file', a: LINKS.cvEn },
+                ' or ', { t: 'version in Russian', a: LINKS.cvRu }] }]
+        },
+        social: {
+            d: 'every link in one line',
+            run: () => [{ ln: [
+                'Email: ', { t: 'constantine@mureev.com', a: LINKS.email },
+                ' | LinkedIn: ', { t: 'mureev', a: LINKS.linkedin },
+                ' | Telegram: ', { t: '@mureev', a: LINKS.telegram },
+                ' | Messenger: ', { t: 'mureev', a: LINKS.messenger }] }]
+        },
+        whoami: {
+            d: 'identity check',
+            run: () => [
+                { ln: [{ t: 'constantine', c: 'hi' }] },
+                { ln: [{ t: 'uid=2009(constantine) gid=42(engineering) groups=fintech,payments,mobile,teams,coffee', c: 'dim' }] }
+            ]
+        },
+        uptime: {
+            d: 'years of service, live',
+            run: (arg, ctx) => {
+                const t = tenure(ctx.now());
+                return [
+                    { ln: [` ${clock(ctx.now())}  up ${t.y} years ${t.m} months, 1 guest, load averages: 0.42 0.99 1.00`] },
+                    { ln: [{ t: ' in software since Sep 2009 · leading teams since 2012 · powered by good people & coffee', c: 'dim' }] }
+                ];
+            }
+        },
+        neofetch: {
+            d: 'the spec sheet',
+            run: (arg, ctx) => [{ neo: specsheet(ctx) }]
+        },
+        theme: {
+            d: 'green · amber · mono · crt · flat',
+            run: (arg, ctx) => {
+                if (!arg) return [
+                    { ln: ['themes: ',
+                        ...THEMES.flatMap((t, i) => [{ t, cmd: 'theme ' + t }, i < THEMES.length - 1 ? ' · ' : '']),
+                        { t: `   (current: ${ctx.theme()})`, c: 'dim' }] },
+                    { ln: [{ t: 'usage: theme <name>', c: 'dim' }] }
+                ];
+                if (THEMES.includes(arg)) return [
+                    { ln: [{ t: `theme set to ${arg}`, c: 'dim' },
+                        arg === 'flat' ? { t: ' — very 2017.', c: 'dim' } : ''] },
+                    { theme: arg }
+                ];
+                return [{ ln: [{ t: `theme: unknown theme: ${arg}`, c: 'err' }] }];
+            }
+        },
+        clear: {
+            d: 'wipe the screen',
+            run: () => [{ clear: true }]
+        },
+        thisistheway: {
+            d: '—',
+            run: () => [{ gif: { src: LINKS.gif, w: 200, alt: 'This is the way.' } }]
+        }
+    };
+
+    /** One line in, Blocks out. The whole shell grammar.
+        @param {string} raw   what the visitor typed
+        @param {{now: () => Date, theme: () => string}} ctx  injected effects
+        @returns {Block[]}                                                 */
+    function dispatch(raw, ctx) {
+        const argv = parse(raw);
+        if (!argv.length) return [];
+        const name = argv[0].toLowerCase();       // own keys only — 'constructor' is not a command
+        const c = Object.prototype.hasOwnProperty.call(COMMANDS, name) ? COMMANDS[name] : null;
+        if (!c) return [{ ln: [{ t: `csh: command not found: ${argv[0]}`, c: 'err' },
+                               ' — try ', { t: 'help', cmd: 'help' }] }];
+        return c.run(argv[1]?.toLowerCase(), ctx);
+    }
+
+    /* @core-end */
+    /* =====================================================================
+       SHELL — the imperative rind. Everything below touches the DOM;
+       nothing below decides *what* to say.
+       ===================================================================== */
+
+    const $id  = (i) => document.getElementById(i);
+    const out  = $id('out'), kbd = $id('kbd');
+    const bufA = $id('pre'), bufB = $id('post'), cur = $id('cursor');
+    $id('ps1').textContent = PS1;
+
+    const ctx  = {
+        now:   () => new Date(),
+        theme: () => document.documentElement.getAttribute('data-theme') || 'green'
+    };
+    const hist = new Hist();
+    const store = {
+        get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
+        set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* fine */ } }
+    };
+
+    /* ---------- rendering: Parts and Blocks → DOM ----------------------- */
+
+    /** @param {Part} p @returns {Node} — textContent only; no innerHTML,
+        no injection surface, nothing for a pentest to find. */
+    function partNode(p) {
+        if (typeof p === 'string') return document.createTextNode(p);
+        let node;
+        if (p.a) {
+            node = document.createElement('a');
+            node.href = p.a;
+            if (!p.a.startsWith('mailto:')) { node.target = '_blank'; node.rel = 'noopener'; }
+        } else if (p.cmd) {
+            node = document.createElement('span');
+            node.className = 'cmd';
+            node.dataset.cmd = p.cmd;
+            node.setAttribute('role', 'button');
+            node.tabIndex = 0;
+        } else {
+            node = document.createElement('span');
+            if (p.c) node.className = p.c;
+        }
+        node.textContent = p.t;
+        return node;
+    }
+
+    function line(parts, cls) {
+        const div = document.createElement('div');
+        div.className = 'ln' + (cls ? ' ' + cls : '');
+        for (const p of (typeof parts === 'string' ? [parts] : parts)) div.append(partNode(p));
+        out.append(div);
+        return div;
+    }
+    const blank = () => line(' ');
+
+    function pre(text, cls) {
+        const p = document.createElement('pre');
+        if (cls) p.className = cls;
+        p.textContent = text;
+        out.append(p);
+        return p;
+    }
+
+    function renderNeo(spec) {
+        const wrap = document.createElement('div');
+        wrap.className = 'neo';
+        const logo = document.createElement('pre');
+        logo.className = 'logo';
+        logo.textContent = LOGO;
+        const info = document.createElement('pre');
+        const hi = (s) => { const n = document.createElement('span'); n.className = 'hi'; n.textContent = s; return n; };
+        info.append(hi(spec.title), '\n' + '─'.repeat(22) + '\n');
+        for (const [label, val] of spec.fields) {
+            info.append(hi(label.padEnd(10)));
+            for (const p of (Array.isArray(val) ? val : [val])) info.append(partNode(p));
+            info.append('\n');
+        }
+        info.append('\n');
+        for (const c of spec.palette) {
+            const s = document.createElement('span');
+            s.className = 'sw';
+            s.style.background = c;
+            info.append(s);
+        }
+        wrap.append(logo, info);
+        out.append(wrap);
+    }
+
+    function renderGif(g) {
+        const img = document.createElement('img');
+        img.src = g.src; img.width = g.w; img.alt = g.alt;
+        img.onload = scroll;
+        img.onerror = () => { img.remove(); line(g.alt); scroll(); };
+        const div = document.createElement('div');
+        div.append(img);
+        out.append(div);
+    }
+
+    function setTheme(name) {
+        document.documentElement.setAttribute('data-theme', name);
+        store.set('mureev:theme', name);
+    }
+
+    /** The effect interpreter: Blocks in, side effects out. This is the
+        entire surface area between pure and impure — keep it boring. */
+    function applyBlocks(blocks) {
+        for (const b of blocks) {
+            if (b.ln)         line(b.ln);
+            else if (b.pre)   pre(b.pre, b.cls);
+            else if (b.neo)   renderNeo(b.neo);
+            else if (b.gif)   renderGif(b.gif);
+            else if (b.clear) out.replaceChildren();
+            else if (b.theme) setTheme(b.theme);
+        }
+    }
+
+    const scroll = () => window.scrollTo({ top: document.documentElement.scrollHeight });
+
+    /* --------------------------------------------------------------------
+       THE ONE CLEVER TRICK — read this before "simplifying" it.
+
+       Every web terminal must answer: where do keystrokes come from?
+       The naive answer — document.onkeydown — fails the moment input
+       isn't a US-QWERTY physical keyboard: Android IMEs batch text and
+       report keyCode 229, iOS autocorrect rewrites words after the fact,
+       dead keys compose, and paste is a different event entirely.
+
+       So we don't fight the platform. An invisible <textarea> (#kbd) is
+       the single source of truth for the line being edited. The browser
+       gives us IME, mobile keyboards, paste, selection and backspace
+       semantics for free — we merely *mirror* its value and caret into
+       the styled prompt row on every change. ~40 lines instead of a
+       2,000-line keyboard layer. That's the trade, and it's a good one.
+       -------------------------------------------------------------------- */
+
+    function render() {
+        const v = kbd.value, s = kbd.selectionStart ?? v.length;
+        bufA.textContent = v.slice(0, s);
+        cur.textContent  = v[s] ? v[s] : ' ';
+        bufB.textContent = v.slice(s + 1);
+    }
+    function setLine(v) {
+        kbd.value = v;
+        kbd.setSelectionRange(v.length, v.length);
+        render();
+    }
+
+    /* ---------- execution ----------------------------------------------- */
+    function exec(raw) {
+        line([{ t: PS1, c: 'ps1' }, raw]);
+        hist.push(raw);
+        applyBlocks(dispatch(raw, ctx));
+        setLine('');
+        scroll();
+    }
+
+    /* ---------- keyboard wiring ----------------------------------------- */
+    let booting = true, skipBoot = false;
+
+    kbd.addEventListener('input', () => {
+        if (kbd.value.includes('\n')) {          // mobile "go" key arrives as \n
+            const v = kbd.value.replace(/\n/g, '');
+            kbd.value = '';
+            exec(v);
+            return;
+        }
+        render();
+        scroll();
+    });
+    document.addEventListener('selectionchange', () => {
+        if (document.activeElement === kbd) render();
+    });
+    kbd.addEventListener('keydown', (e) => {
+        if (booting) { skipBoot = true; return; }
+        const k = e.key;
+        if (k === 'Enter')          { e.preventDefault(); exec(kbd.value); }
+        else if (k === 'ArrowUp')   { e.preventDefault(); const v = hist.prev(kbd.value); if (v !== null) setLine(v); }
+        else if (k === 'ArrowDown') { e.preventDefault(); const v = hist.next(); if (v !== null) setLine(v); }
+        else if (k === 'Tab') {
+            e.preventDefault();
+            const r = complete(kbd.value, Object.keys(COMMANDS));
+            if (r?.set) setLine(r.set);
+            else if (r?.list) {
+                line([{ t: PS1, c: 'ps1' }, kbd.value]);
+                line(r.list.map((c) => ({ t: c + '  ', cmd: c })), 'dim');
+                scroll();
+            }
+        }
+        else if (k === 'c' && e.ctrlKey) {
+            e.preventDefault();
+            line([{ t: PS1, c: 'ps1' }, kbd.value + '^C']);
+            hist.reset(); setLine(''); scroll();
+        }
+        else if (k === 'l' && e.ctrlKey) { e.preventDefault(); out.replaceChildren(); }
+        else if (k === 'u' && e.ctrlKey) { e.preventDefault(); setLine(''); }
+    });
+
+    /* Focus routing: physical keys land in the sink even if focus wandered;
+       taps focus it too — but never at the price of a text selection or a
+       link click. The terminal should feel inevitable, not grabby. */
+    const focus = () => kbd.focus({ preventScroll: true });
+    document.addEventListener('keydown', (e) => {
+        if (booting) { skipBoot = true; return; }
+        if (e.target !== kbd && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.length === 1) {
+            focus();
+            kbd.setRangeText(e.key, kbd.selectionStart ?? kbd.value.length,
+                             kbd.selectionEnd ?? kbd.value.length, 'end');
+            e.preventDefault();
+            render(); scroll();
+        } else if (e.target !== kbd) {
+            focus();
+        }
+    });
+    document.addEventListener('pointerup', (e) => {
+        if (booting) { skipBoot = true; return; }
+        if (e.target.closest('a')) return;
+        const c = e.target.closest('.cmd');
+        if (c) { exec(c.dataset.cmd); focus(); return; }
+        if (String(window.getSelection() || '')) return;   // let people copy
+        focus();
+    });
+    out.addEventListener('keydown', (e) => {
+        const c = e.target.closest?.('.cmd');
+        if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); exec(c.dataset.cmd); }
+    });
+
+    /* ---------- boot ----------------------------------------------------- */
+    const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+    const instant = matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    /** Types a greeting line character by character, then swaps in the
+        rich (linked) version. Any key or tap skips the theater — never
+        make a visitor wait for a cursor. */
+    async function typeLine(parts) {
+        if (!parts.length) { blank(); return; }
+        const text = parts.map((p) => typeof p === 'string' ? p : p.t).join('');
+        const div = line('');
+        for (let i = 1; i <= text.length; i++) {
+            if (skipBoot || instant) break;
+            div.textContent = text.slice(0, i);
+            scroll();
+            await wait(9);
+        }
+        div.replaceChildren();                        // swap in the rich version
+        const rich = line(parts); rich.remove();      // (built off-screen)
+        div.append(...rich.childNodes);
+        div.className = rich.className;
+        scroll();
+    }
+
+    (async function boot() {
+        pre(LOGO, 'logo');
+        for (const l of GREETING) await typeLine(l);
+        blank();
+        /* motd prints where a real login puts it — last, right before the
+           prompt. A system whisper, not a headline. */
+        line([{ t: 'motd: hand-rolled terminal · zero dependencies · no frameworks were harmed', c: 'dim' }]);
+        if (matchMedia('(pointer: coarse)').matches) {
+            line([{ t: '[tap anywhere to type]', c: 'dim' }]);
+        }
+        booting = false;
+        render();
+        if (matchMedia('(pointer: fine)').matches) focus();
+        scroll();
+    })();
+
+    /* ---------- hooks & hellos ------------------------------------------- */
+
+    /* Exposed for the e2e suite — and for you, console explorer. */
+    window.csh = Object.freeze({
+        VERSION, PS1, THEMES, LOGO, LINKS, GREETING,
+        parse, tenure, clock, Hist, complete, specsheet, dispatch, COMMANDS
+    });
+
+    console.log('%cmureev.com', 'color:#34ff6d;font-weight:bold',
+        '— hand-rolled, zero dependencies. The source you are reading is the product. Agents: your briefing is at /llms.txt');
+
+    /*  zero dependencies —
+        the cursor blinks by itself.
+        view source. found you.  */
+    </script>
+</body>
+</html>
