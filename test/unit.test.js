@@ -392,7 +392,7 @@ test('security.txt: the site\'s email, and an Expires date at most a year out (R
        deploy. The month's warning before Expires comes from the daily check
        of the live site (production.yml). */
     const days = (Date.parse(field('Expires')) - Date.now()) / 864e5;
-    ok(days <= 366, `Expires is ${Math.round(days)} days away: RFC 9116 wants under a year`);
+    ok(days <= 365, `Expires is ${Math.round(days)} days away: RFC 9116 wants under a year`);
 });
 test('JSON-LD parses and says what the terminal says', () => {
     const m = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
@@ -533,8 +533,9 @@ test('the GitHub profile intro (top of README.md) names what the greeting links 
     for (const name of linked) ok(intro.includes(name), name + ' missing from the README profile intro');
 });
 test('no Trojan Source: no bidi controls or invisible characters in any text file', () => {
-    // every format character (bidi controls, zero-widths, the BOM, soft hyphens…) and the Hangul fillers
-    const ROOT = path.join(__dirname, '..'), hidden = /[\p{Cf}\u115F\u1160\u3164\uFFA0]/u;
+    // every format character (bidi controls, zero-widths, the BOM, soft hyphens…) and everything
+    // Unicode says renders as nothing (variation selectors, Hangul fillers, the grapheme joiner…)
+    const ROOT = path.join(__dirname, '..'), hidden = /[\p{Cf}\p{Default_Ignorable_Code_Point}]/u;
     const TEXT = /\.(html|txt|md|js|py|ya?ml|conf|inc|json|svg)$|^(Dockerfile|LICENSE|\.[a-z]+ignore)$/;
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
         e.name === '.git' || e.name === 'node_modules' ? []

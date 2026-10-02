@@ -85,7 +85,7 @@ test/
 .github/workflows/ci.yml  the suite, then the image: built once, smoke-tested,
                   e2e against the container; from master, a job that runs
                   no npm publishes those very bytes
-.github/workflows/production.yml  daily: the suites against the live site
+.github/workflows/production.yml  daily: the e2e suite against the live site
 tools/make_og.py  regenerates assets/og.png when the card changes (Pillow)
 tools/make_favicon.py  regenerates favicon.ico + apple-touch-icon.png
                   (favicon.svg is hand-written and the design's source of truth)

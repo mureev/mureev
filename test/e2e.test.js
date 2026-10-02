@@ -230,6 +230,41 @@ const watch = (p) => {
     check('a right-click on a command runs nothing: the context menu is the browser\'s', (await tally('this list')) === helps);
     await kp.locator('#kbd').focus();
 
+    await kp.keyboard.type('whoami'); await press('Enter');
+    const tabs = ax.pages().length;
+    await kp.locator('#out a', { hasText: 'Renmoney' }).first().click({ button: 'middle' });
+    await kp.waitForTimeout(150);
+    for (const extra of ax.pages().slice(tabs)) await extra.close();
+    await press('ArrowUp');
+    check('…a middle-click (a background tab) hands the keys back too', (await focused()) === 'kbd' && (await prompt()) === 'whoami',
+        JSON.stringify({ focus: await focused(), prompt: await prompt() }));
+    await press('Control+u');
+
+    /* a drag that ends on a link or a command is a selection: it is kept for
+       copying, and nothing opens or runs */
+    const drag = async (target) => {
+        await target.scrollIntoViewIfNeeded();
+        const to = await target.boundingBox(), from = await target.locator('xpath=..').boundingBox();
+        await kp.mouse.move(from.x + 2, to.y + to.height / 2);
+        await kp.mouse.down();
+        await kp.mouse.move(to.x + to.width - 2, to.y + to.height / 2, { steps: 8 });
+        await kp.mouse.up();
+        await kp.waitForTimeout(100);
+        return kp.evaluate(() => String(getSelection()));
+    };
+    await kp.keyboard.type('contacts'); await press('Enter');
+    const picked = await drag(kp.locator('#out a[href^="mailto:"]').last());
+    await press('ControlOrMeta+c');
+    check('a drag-selection that ends on a link stays selected, and copies',
+        picked.startsWith('Email me at') && picked.endsWith('constantine@mureev.com') &&
+        (await kp.evaluate(() => navigator.clipboard.readText())) === picked, JSON.stringify(picked));
+    const ranHelp = await tally('this list');
+    const dragged = await drag(kp.locator('#out .cmd', { hasText: 'help' }).first());
+    check('…and one that ends on a command runs nothing', dragged.endsWith('help') && (await tally('this list')) === ranHelp,
+        JSON.stringify(dragged));
+    await kp.evaluate(() => getSelection().removeAllRanges());
+    await kp.locator('#kbd').focus();
+
     await kp.evaluate(() => {
         document.activeElement.blur();
         getSelection().selectAllChildren([...document.querySelectorAll('#out .ln')].find((l) => l.textContent === 'Ready to chat?'));
@@ -293,8 +328,12 @@ const watch = (p) => {
     const sr = watch(await ax.newPage());
     await sr.addInitScript(() => document.addEventListener('DOMContentLoaded', () => {
         window.__updates = 0;
-        const hidden = (n) => !!(n.nodeType === 1 ? n : n.parentElement)?.closest('[aria-hidden="true"]');
-        new MutationObserver((recs) => { if (recs.some((r) => !hidden(r.addedNodes[0] || r.target))) window.__updates++; })
+        const heard = (r) => {                       // something new, on the page, not hidden from assistive tech
+            const n = r.type === 'childList' ? r.addedNodes[0] : r.target;
+            const el = n && (n.nodeType === 1 ? n : n.parentElement);
+            return !!el && el.isConnected && !el.closest('[aria-hidden="true"]');
+        };
+        new MutationObserver((recs) => { if (recs.some(heard)) window.__updates++; })
             .observe(document.getElementById('out'), { childList: true, subtree: true, characterData: true, attributes: true });
     }));
     await sr.goto(URL);
@@ -342,13 +381,14 @@ const watch = (p) => {
     check('a newline typed mid-line (a mobile "go" key) runs the whole line',
         (await typed()).at(-1) === 'whoami' && (await promptNow()) === '', JSON.stringify((await typed()).slice(-2)));
     const ranBefore = (await typed()).length;
-    await ip.evaluate(() => navigator.clipboard.writeText('whoami\n'.repeat(150)));
+    await ip.evaluate(() => navigator.clipboard.writeText('whoami\n'.repeat(150) + 'tail'));
     await ip.keyboard.press('ControlOrMeta+v');
     await ip.waitForTimeout(300);
     const ranNow = (await typed()).length - ranBefore;
-    check('a huge paste runs its first 100 lines and says so, rather than freeze the tab',
+    check('a huge paste runs its first 100 lines and says so, rather than freeze the tab; the unfinished line waits',
         ranNow === 100 && (await ip.locator('#out').innerText()).includes('csh: paste: ran 100 of 150 lines') &&
-        (await promptNow()) === '', ranNow + ' lines ran');
+        (await promptNow()) === 'tail', ranNow + ' lines ran; prompt ' + JSON.stringify(await promptNow()));
+    await ip.keyboard.press('Control+u');
     await ip.keyboard.type('hi \u{1F44B}\u{1F3FD} there');
     for (let i = 0; i < 7; i++) await ip.keyboard.press('ArrowLeft');
     await ip.waitForTimeout(100);                       // the mirror follows on selectionchange

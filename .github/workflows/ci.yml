@@ -34,7 +34,7 @@ jobs:
       - run: npm test
 
   # Build once, test that image, ship that image: the build is set aside before any npm code runs,
-  # and publish — a job that runs none — ships exactly those bytes. This job can't push anything.
+  # and publish — a job that runs none — ships that very image. This job can't push anything.
   image:
     name: image — build and test
     needs: suite
@@ -66,7 +66,7 @@ jobs:
         with:
           name: image
           path: site.tar
-          retention-days: 1
+          retention-days: 3           # long enough to re-run a failed publish
           if-no-files-found: error
       - run: docker run -d --name site -p 8080:80 site
       - name: Serve like production
