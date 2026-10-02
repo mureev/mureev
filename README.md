@@ -78,6 +78,7 @@ npm ci                             # Playwright, the only devDependency
 npx playwright install chromium    # once: the browser the e2e suite drives
 npm test                           # unit (headless core, zero-dep runner) + e2e (real Chromium)
 E2E_URL=http://127.0.0.1:8080/ npm run test:e2e   # e2e against the running image: headers, caching, errors
+E2E_URL=https://mureev.com/ npm run test:e2e      # the live site, as the daily check runs it
 ```
 
 The unit suite slices the engine's pure core out of `index.html` by its
@@ -95,9 +96,11 @@ earning its place — and runs the e2e suite again against the container.
 | `content/index.html` | the site — markup, styles, and the `csh` engine |
 | `content/404.html`, `50x.html` | error pages, self-contained, zero JS |
 | `content/llms.txt` | briefing for AI agents |
+| `content/.well-known/security.txt` | where to report a vulnerability ([RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)) |
 | `conf/` | nginx, and the response headers (note the X-Clacks-Overhead) |
 | `test/` | unit + e2e suites |
 | `.github/workflows/ci.yml` | the suites, then the image's smoke test and e2e, on every push; publishes that image from `master` |
+| `.github/workflows/production.yml` | daily: the live site — certificates, the proxy's headers, the CVs — through the same e2e suite |
 | `tools/` | generators for `og.png` and the favicons |
 | `AGENTS.md` / `CLAUDE.md` | the contract for whoever builds next |
 

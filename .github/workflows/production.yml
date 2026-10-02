@@ -1,0 +1,32 @@
+name: production
+
+# Once a day, the live site: the e2e suite aimed at https://mureev.com/, with
+# the checks only production can fail — the TLS proxy, the certificates, the
+# CVs the server mounts — plus the unit suite, whose security.txt test is the
+# one that keeps a calendar. A red run emails whoever last edited this schedule.
+on:
+  schedule:
+    - cron: '23 5 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  live:
+    name: mureev.com, live
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run test:unit
+      - run: npx playwright install --with-deps chromium
+      - name: e2e against the live site
+        run: npm run test:e2e
+        env:
+          E2E_URL: https://mureev.com/

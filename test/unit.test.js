@@ -384,6 +384,13 @@ test('the command set is the approved eleven (AGENTS.md rule 5 — change only w
         'neofetch', 'theme', 'clear', 'thisistheway']));
 test('the themes are the approved five', () =>
     eq(csh.THEMES, ['green', 'amber', 'mono', 'crt', 'flat']));
+test('security.txt: the site\'s email, and an Expires date 30–366 days out (RFC 9116)', () => {
+    const txt = fs.readFileSync(path.join(__dirname, '..', 'content', '.well-known', 'security.txt'), 'utf8');
+    const field = (name) => (new RegExp('^' + name + ': *(.+)$', 'm').exec(txt) || [])[1];
+    eq(field('Contact'), csh.LINKS.email);
+    const days = (Date.parse(field('Expires')) - Date.now()) / 864e5;   // the one test with a calendar, on purpose
+    ok(days > 30 && days <= 366, `Expires is ${Math.round(days)} days away: set it to just under a year from today`);
+});
 test('JSON-LD parses and says what the terminal says', () => {
     const m = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
     ok(m, 'no JSON-LD block');

@@ -51,6 +51,7 @@ build.
    purpose, so a change touches every copy: `LINKS`, `GREETING` and the
    command bodies in the core (incl. `neofetch`'s spec sheet), the `<head>`
    (title, description, OG, JSON-LD), the no-JS `#fallback`, `llms.txt`,
+   the contact in `.well-known/security.txt`,
    the card in `assets/og.png` (regenerate with `tools/make_og.py`), and the
    profile intro at the top of `README.md` — it is the owner's GitHub
    profile. Unit tests hold the contact links in `LINKS`, `#fallback` and
@@ -68,6 +69,8 @@ content/
   50x.html        same
   llms.txt        briefing for AI agents crawling the site
   robots.txt      points them at llms.txt
+  .well-known/security.txt  where to report a vulnerability (RFC 9116); its
+                  Expires date has a test that fails a month ahead
   assets/         og.png (social preview); CV/ is mounted from the server in
                   production — the PDFs are never in this repo or image
 conf/
@@ -82,6 +85,7 @@ test/
 .github/workflows/ci.yml  the suite, then the image: built once, smoke-tested,
                   e2e against the container, and that image published
                   from master
+.github/workflows/production.yml  daily: the suites against the live site
 tools/make_og.py  regenerates assets/og.png when the card changes (Pillow)
 tools/make_favicon.py  regenerates favicon.ico + apple-touch-icon.png
                   (favicon.svg is hand-written and the design's source of truth)

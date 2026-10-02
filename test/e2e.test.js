@@ -14,6 +14,7 @@
 
 const { chromium, request } = require('playwright');
 const path = require('path');
+const tls = require('tls');
 
 /* The page under test: the file itself, or — with E2E_URL — a served copy
    (CI aims it at the built image: same suite, plus what only a server can
@@ -365,14 +366,17 @@ const watch = (p) => {
         console.log('\nserved like production  (' + URL + ')');
         const http = await request.newContext({ baseURL: URL, maxRedirects: 0 });
         const one = (r, name) => r.headersArray().filter((h) => h.name.toLowerCase() === name).map((h) => h.value);
-        const PAGES = ['/', '/no-such-page', '/assets/'], FILES = ['/assets/og.png', '/llms.txt'];
+        const live = URL.startsWith('https:');                // production: the TLS proxy is in front
+        const PAGES = ['/', '/no-such-page', '/assets/'];
+        const FILES = ['/assets/og.png', '/llms.txt', '/.well-known/security.txt'];
         const heads = [];
         for (const p of [...PAGES, ...FILES]) heads.push([p, await http.get(p)]);
         heads.push(['HEAD /', await http.head('/')]);
         for (const [p, r] of heads) {
             const page = !FILES.includes(p);
             const want = { 'x-content-type-options': ['nosniff'], 'x-clacks-overhead': ['GNU Terry Pratchett'],
-                'content-security-policy': page ? ["frame-ancestors 'none'"] : [], 'strict-transport-security': [] };
+                'content-security-policy': page ? ["frame-ancestors 'none'"] : [] };
+            if (!live) want['strict-transport-security'] = [];    // HSTS is the proxy's to send, never ours
             const got = Object.fromEntries(Object.keys(want).map((k) => [k, one(r, k)]));
             check(`${p}: its headers, each exactly once${page ? '' : ' (no framing rule: not a page)'}`,
                 JSON.stringify(got) === JSON.stringify(want) && r.headers().server === 'nginx', JSON.stringify(got));
@@ -380,8 +384,8 @@ const watch = (p) => {
         const at = (p) => heads.find(([q]) => q === p)[1];
         check('pages revalidate on every visit; images keep for a day',
             at('/').headers()['cache-control'] === 'no-cache' && at('/assets/og.png').headers()['cache-control'] === 'max-age=86400');
-        check('text says it is utf-8 (llms.txt: em dashes, Cyrillic)',
-            at('/llms.txt').headers()['content-type'] === 'text/plain; charset=utf-8');
+        check('text says it is utf-8 (llms.txt has em dashes and Cyrillic; RFC 9116 requires it of security.txt)',
+            ['/llms.txt', '/.well-known/security.txt'].every((p) => at(p).headers()['content-type'] === 'text/plain; charset=utf-8'));
         check('gzip, and Vary says so', at('/').headers()['content-encoding'] === 'gzip' && /accept-encoding/i.test(at('/').headers().vary));
         check('a missing page or a bare directory: the terminal 404, status 404',
             (await Promise.all(['/no-such-page', '/assets/'].map(async (p) =>
@@ -389,6 +393,33 @@ const watch = (p) => {
         const slash = await http.get('/assets');
         check('the trailing-slash redirect stays relative (so on https behind the proxy)',
             slash.status() === 301 && slash.headers().location === '/assets/', slash.status() + ' → ' + slash.headers().location);
+
+        /* what only production can get wrong: the proxy, the certificates,
+           the CVs the server mounts. The daily check (production.yml) is this. */
+        if (live) {
+            console.log('\nproduction only');
+            check('HSTS from the proxy: https only, for a year',
+                JSON.stringify(one(at('/'), 'strict-transport-security')) === '["max-age=31536000"]',
+                JSON.stringify(one(at('/'), 'strict-transport-security')));
+            const site = new globalThis.URL(URL).hostname;
+            const hosts = site === 'mureev.com' ? ['mureev.com', 'www.mureev.com', 'mureev.ru', 'www.mureev.ru'] : [site];
+            const daysLeft = (host) => new Promise((resolve) => {
+                const s = tls.connect({ host, port: 443, servername: host, timeout: 10000 }, () => {
+                    resolve(s.authorized ? Math.floor((Date.parse(s.getPeerCertificate().valid_to) - Date.now()) / 864e5) : -1);
+                    s.end();
+                });
+                s.on('error', () => resolve(-1));
+                s.on('timeout', () => { s.destroy(); resolve(-1); });
+            });
+            const days = await Promise.all(hosts.map(daysLeft));
+            check('every hostname: a valid certificate, two weeks from expiry or more',
+                days.every((d) => d >= 14), hosts.map((h, i) => `${h}: ${days[i]}d`).join(', '));
+            const LINKS = await page.evaluate(() => csh.LINKS);
+            const cvs = await Promise.all([LINKS.cvEn, LINKS.cvRu].map((u) => http.head(u)));
+            check('both CVs are served (the server mounts them; the image never has them)',
+                cvs.every((r) => r.status() === 200 && r.headers()['content-type'] === 'application/pdf'),
+                cvs.map((r) => r.status() + ' ' + r.headers()['content-type']).join(', '));
+        }
         await http.dispose();
     }
 
