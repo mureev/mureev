@@ -3,7 +3,7 @@
 
 # Pinned minor: builds shouldn't change because Tuesday happened.
 # (-slim skips the njs/geoip modules a static site will never load.)
-FROM nginx:1.30-alpine-slim
+FROM nginx:1.31-alpine-slim
 
 LABEL org.opencontainers.image.title="mureev.com" \
       org.opencontainers.image.description="Personal site of Constantine Mureev — a terminal, hand-rolled" \
