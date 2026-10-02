@@ -20,11 +20,10 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <!-- Nothing runs or renders here unless it shipped in this file, byte
-         for byte: each inline <script> and <style> below is allowed by its
-         sha256, and no string may become markup (Trusted Types). Edit one
-         and the unit suite prints the new line for this tag. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-Hf+LFWKcuLuinqA0MTAp6ymN3gpUkSGYh3Rvmbv/BXo='; style-src 'sha256-5J0TC0x2/2kqrsnnIADs8zlVd7WUBBJWOGVhl4HoUII='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+    <!-- Only this file's own code runs here: each inline <script> and <style>
+         is allowed by its sha256, and no string becomes markup (Trusted Types).
+         Edit one, and the unit suite prints this tag's new policy. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-1B3qiHf+FvcKWiJEJ2vOWg+EiK7tQlOTOeGF/2Aq1kI='; style-src 'sha256-mB4rKwSWKDYZclIoFtJ2SXvtMBA43ODEBTch/7GBtck='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -154,9 +153,8 @@
             animation: blink 1.1s steps(1) infinite;
         }
         @keyframes blink { 50% { background: transparent; color: var(--fg); } }
-        /* Focus is elsewhere — a link, the page, a tap not yet made: the
-           block goes hollow and holds still, as terminal emulators do. The
-           textarea is invisible, so this block is its focus indicator. */
+        /* The textarea is invisible, so this block is its focus indicator:
+           hollow and still while focus is elsewhere, as in a terminal emulator. */
         #term:not(:has(#kbd:focus)) #cursor {
             background: transparent; color: inherit;
             box-shadow: inset 0 0 0 1px var(--fg); animation: none;
@@ -209,11 +207,9 @@
             #cursor { animation: none; }
             #fx, #fx::before { animation: none !important; }
         }
-        /* Asked for more contrast? No glow, no glass. Forced colors (Windows
-           High Contrast): the OS owns the palette and drops the glass itself,
-           but it would repaint the cursor into its surroundings — so the
-           cursor paints itself in system colours: a solid block while the
-           prompt has focus, an outline while it doesn't. */
+        /* More contrast asked for: no glow, no glass. Forced colours (Windows
+           High Contrast) would repaint the cursor into its surroundings, so it
+           paints itself in system colours: solid with focus, outlined without. */
         @media (prefers-contrast: more) {
             body { text-shadow: none; }
             #fx { display: none; }
@@ -731,26 +727,26 @@
     /* ---------- keyboard wiring ----------------------------------------- */
     let booting = true, skipBoot = false;
     const PASTE_MAX = 100;
+    const selecting = () => String(getSelection() || '') !== '';   // then the keys and taps are for copying
 
-    kbd.addEventListener('input', (e) => {
-        if (/[\r\n]/.test(kbd.value)) {
-            const lines = kbd.value.split(/\r\n?|\n/);
-            kbd.value = '';
-            if (/^insertFrom/.test(e.inputType)) {  // a paste runs line by line, like a terminal;
-                const rest = lines.pop();            // what follows the last newline waits at the prompt
-                for (const l of lines.slice(0, PASTE_MAX)) exec(l);
-                if (lines.length > PASTE_MAX) {      // …up to a point: thousands would freeze the tab
-                    line([{ t: `csh: paste: ran ${PASTE_MAX} of ${lines.length} lines`, c: 'err' }]);
-                    scroll();
-                }
-                setLine(rest);
-            } else {
-                exec(lines.join(''));                // a mobile "go" key, wherever the caret was
-            }
-            return;
-        }
-        render();
+    /** A newline reached the sink. A paste runs line by line, like a
+        terminal — the unfinished last line waits at the prompt — and stops
+        at PASTE_MAX: thousands would freeze the tab. Any other newline is a
+        phone's "go" key, wherever the caret was: it runs the whole line. */
+    function enter(text, pasted) {
+        const lines = text.split(/\r\n?|\n/);
+        if (!pasted) return exec(lines.join(''));
+        const rest = lines.pop();
+        for (const l of lines.slice(0, PASTE_MAX)) exec(l);
+        if (lines.length > PASTE_MAX) line([{ t: `csh: paste: ran ${PASTE_MAX} of ${lines.length} lines`, c: 'err' }]);
+        setLine(rest);
         scroll();
+    }
+    kbd.addEventListener('input', (e) => {
+        if (!/[\r\n]/.test(kbd.value)) { render(); scroll(); return; }
+        const text = kbd.value;
+        kbd.value = '';
+        enter(text, /^insertFrom/.test(e.inputType));
     });
     document.addEventListener('selectionchange', () => {
         if (document.activeElement === kbd) render();
@@ -796,13 +792,13 @@
                              kbd.selectionEnd ?? kbd.value.length, 'end');
             e.preventDefault();
             render(); scroll();
-        } else if (!own && !String(window.getSelection() || '')) {   // let people copy
+        } else if (!own && !selecting()) {
             focus();
         }
     });
     document.addEventListener('pointerup', (e) => {
         if (booting) { skipBoot = true; return; }
-        if (String(window.getSelection() || '')) return;   // a drag selected text: let people copy
+        if (selecting()) return;                      // a drag that selected text
         if (e.target.closest('a')) {                  // the link opens; the prompt gets the keys back
             if (e.pointerType === 'mouse' && e.button < 2) setTimeout(focus);
             return;
@@ -816,12 +812,10 @@
         }
         if (e.pointerType !== 'touch') focus();      // a finger's tap is touchend's: below
     });
-    /* Tap to type. A phone raises its keyboard only for a focus made inside
-       a touch event, and the click a browser sends after a tap blurs it
-       again with its mousedown. So the tap is taken at touchend, and
-       cancelled: no click follows. And no mouse listeners on this page,
-       ever — on iOS one alone turns every tap into such a click (WebKit's
-       nodeRespondingToClickEvents), and the keyboard bounces. */
+    /* Tap to type. A phone raises its keyboard only for a focus given during
+       a touch event, and the click that follows a tap would blur it again,
+       so the tap is taken at touchend and cancelled. For the same reason the
+       page has no mouse listeners: on iOS one alone makes every tap a click. */
     let tap = null;                                   // where a one-finger touch began, until it moves
     document.addEventListener('touchstart', (e) => {
         tap = e.touches.length === 1 ? [e.touches[0].clientX, e.touches[0].clientY] : null;
@@ -832,7 +826,7 @@
     document.addEventListener('touchend', (e) => {
         const tapped = tap && !e.touches.length;
         tap = null;
-        if (booting || !tapped || e.target.closest('a, .cmd') || String(window.getSelection() || '')) return;
+        if (booting || !tapped || e.target.closest('a, .cmd') || selecting()) return;
         e.preventDefault();
         focus();
     });
