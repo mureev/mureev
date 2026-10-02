@@ -53,7 +53,7 @@ test('core is DOM-free (no document/window/localStorage/matchMedia)', () => {
 });
 
 const csh = vm.runInNewContext(
-    core + '\n;({ VERSION, PS1, THEMES, LOGO, LINKS, GREETING, parse, tenure, clock, Hist, complete, specsheet, dispatch, COMMANDS })',
+    core + '\n;({ VERSION, PS1, THEMES, LOGO, LINKS, GREETING, parse, tenure, clock, Hist, complete, glyphAt, specsheet, dispatch, COMMANDS })',
     {}, { filename: 'csh-core.vm.js' });
 
 test('core evaluates headless and exports the API', () => {
@@ -140,6 +140,23 @@ test('theme arguments complete too', () =>
     eq(csh.complete('theme a', NAMES), { set: 'theme amber ' }));
 test('arguments of other commands do not', () =>
     eq(csh.complete('cv x', NAMES), null));
+
+/* ---------- the cursor cell ------------------------------------------------ */
+console.log('\nthe cursor cell  (one whole character, however many code units)');
+test('plain text: the next character; end of line: nothing', () => {
+    eq(csh.glyphAt('help', 1), 'e');
+    eq(csh.glyphAt('help', 4), '');
+});
+const CLUSTERS = { rocket: '\u{1F680}', family: '\u{1F468}\u200D\u{1F469}\u200D\u{1F467}', flag: '\u{1F1F3}\u{1F1FF}',
+    'skin tone': '\u{1F44B}\u{1F3FD}', accent: 'e\u0301' };
+test('an emoji, a family, a flag, a skin tone, an accent: each is one cell', () => {
+    for (const [what, g] of Object.entries(CLUSTERS)) eq(csh.glyphAt('x' + g + 'y', 1), g, what);
+});
+test('without Intl.Segmenter (older browsers) an emoji is still never split', () => {
+    const old = vm.runInNewContext('delete Intl.Segmenter;' + core + '\n;glyphAt', {});
+    eq(old(CLUSTERS.rocket + 'y', 0), CLUSTERS.rocket);
+    eq(old('help', 4), '');
+});
 
 /* ---------- commands ------------------------------------------------------- */
 console.log('\ncommands  (pure: Blocks in, no DOM anywhere)');
@@ -305,6 +322,19 @@ for (const atom of ATOMS) {
 }
 test(`the table: ${TABLE.length} lines — every hostile atom against every command and theme`, () =>
     TABLE.forEach(survives));
+test('the cursor walks any pair of hostile atoms glyph by glyph and rebuilds it exactly', () => {
+    const short = ATOMS.filter((s) => s.length < 64);
+    for (const x of short) for (const y of short) {
+        const line = x + y;
+        let rebuilt = '';
+        for (let i = 0; i < line.length;) {
+            const g = csh.glyphAt(line, i);
+            ok(g.length > 0, 'an empty cell inside ' + show(line));
+            rebuilt += g; i += g.length;
+        }
+        ok(rebuilt === line, 'rebuilt ' + show(rebuilt) + ' from ' + show(line));
+    }
+});
 
 function mulberry32(seed) {   // tiny, deterministic, good enough for this job
     return () => {

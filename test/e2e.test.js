@@ -253,6 +253,42 @@ const check = (name, cond, extra = '') => {
         first.includes("G'day, I'm Constantine Mureev.") && first.includes('Type help for commands.') && first.includes('motd'));
     await ax.close();
 
+    /* ---------- input edge cases ---------- */
+    console.log('\ninput edge cases');
+    const ic = await browser.newContext({ viewport: { width: 1440, height: 900 } });
+    await ic.grantPermissions(['clipboard-read', 'clipboard-write']);
+    const ip = await ic.newPage();
+    await ip.goto(URL);
+    await ip.keyboard.press('Escape');
+    await ip.waitForFunction(() => document.querySelector('#out').innerText.includes('motd'));
+    const typed = () => ip.evaluate(() => [...document.querySelectorAll('#out .ln')]
+        .map((l) => l.textContent).filter((l) => l.startsWith(csh.PS1)).map((l) => l.slice(csh.PS1.length)));
+    const promptNow = () => ip.locator('#kbd').inputValue();
+    await ip.evaluate(() => navigator.clipboard.writeText('whoami\r\nuptime\nabo'));
+    await ip.locator('#kbd').focus();
+    await ip.keyboard.press('ControlOrMeta+v');
+    await ip.waitForTimeout(150);
+    check('a multi-line paste runs line by line; the unfinished last line waits at the prompt',
+        JSON.stringify((await typed()).slice(-2)) === '["whoami","uptime"]' && (await promptNow()) === 'abo' &&
+        (await ip.locator('#out').innerText()).includes('uid=2009(constantine)'),
+        JSON.stringify({ ran: await typed(), prompt: await promptNow() }));
+    await ip.locator('#kbd').evaluate((k) => {          // what some Android keyboards send for "go"
+        k.value = 'who\nami';
+        k.dispatchEvent(new InputEvent('input', { inputType: 'insertLineBreak' }));
+    });
+    check('a newline typed mid-line (a mobile "go" key) runs the whole line',
+        (await typed()).at(-1) === 'whoami' && (await promptNow()) === '', JSON.stringify((await typed()).slice(-2)));
+    await ip.keyboard.type('hi \u{1F44B}\u{1F3FD} there');
+    for (let i = 0; i < 7; i++) await ip.keyboard.press('ArrowLeft');
+    await ip.waitForTimeout(100);                       // the mirror follows on selectionchange
+    const cells = await ip.evaluate(() => ['pre', 'cursor', 'post'].map((i) => document.getElementById(i).textContent));
+    check('the cursor sits on a whole emoji, never half of one',
+        JSON.stringify(cells) === JSON.stringify(['hi ', '\u{1F44B}\u{1F3FD}', ' there']), JSON.stringify(cells));
+    check('mobile keyboards are asked to leave commands alone: no autocorrect, capitals or spellcheck',
+        await ip.locator('#kbd').evaluate((k) =>
+            k.getAttribute('autocorrect') === 'off' && k.getAttribute('autocapitalize') === 'off' && !k.spellcheck));
+    await ic.close();
+
     /* ---------- mobile ---------- */
     console.log('\nmobile (390×844, touch)');
     const mob = await browser.newPage({
@@ -267,6 +303,18 @@ const check = (name, cond, extra = '') => {
     const mt = await mob.locator('#term').innerText();
     check('boot completes untouched', mt.includes('Type help for commands.'));
     check('coarse pointers get the tap hint', mt.includes('[tap anywhere to type]'));
+    await mob.evaluate(() => {                          // count every time the prompt takes focus
+        window.__focus = 0;
+        document.getElementById('kbd').addEventListener('focus', () => window.__focus++);
+    });
+    await mob.locator('#out .cmd', { hasText: 'help' }).first().tap();
+    await mob.waitForTimeout(150);
+    check('a tapped command runs, and no keyboard rises over its output',
+        (await mob.locator('#out').innerText()).includes('this list') && (await mob.evaluate(() => window.__focus)) === 0);
+    await mob.locator('#out pre.logo').first().tap();
+    await mob.waitForTimeout(100);
+    check('a tap anywhere else focuses the prompt, and it stays focused',
+        (await mob.evaluate(() => document.activeElement.id)) === 'kbd');
 
     /* ---------- no JavaScript ---------- */
     console.log('\nno-JS fallback');
