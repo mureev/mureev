@@ -37,9 +37,9 @@ build.
 4. **Functional core, imperative shell.** All logic between the
    `/* @core-start */` and `/* @core-end */` markers is pure: no DOM, no
    globals, no clock of its own (time and theme arrive via `ctx`). Commands
-   return Block descriptions; only `applyBlocks` touches pixels. The unit
-   suite extracts the core by those markers and runs it in a bare `node:vm`
-   — DOM access in the core is a build failure by design.
+   return Block descriptions, and `applyBlocks` alone turns them into pixels.
+   The unit suite extracts the core by those markers and runs it in a bare
+   `node:vm` — DOM access in the core is a build failure by design.
 5. **Content is minimal by choice.** Name, one line, contacts, CV. The owner
    explicitly declined a career timeline, a "now" section, and how-I-work
    notes. The visible command set (11 commands) is a decision, not an
@@ -51,12 +51,12 @@ build.
    purpose, so a change touches every copy: `LINKS`, `GREETING` and the
    command bodies in the core (incl. `neofetch`'s spec sheet), the `<head>`
    (title, description, OG, JSON-LD), the no-JS `#fallback`, `llms.txt`,
-   the contact in `.well-known/security.txt`,
-   the card in `assets/og.png` (regenerate with `tools/make_og.py`), and the
-   profile intro at the top of `README.md` — it is the owner's GitHub
-   profile. Unit tests hold the contact links in `LINKS`, `#fallback` and
-   `llms.txt` to each other, and the README intro to whatever the greeting
-   links to.
+   the contact in `.well-known/security.txt`, the card in `assets/og.png`
+   (regenerate with `tools/make_og.py`), and the profile intro at the top of
+   `README.md` — it is the owner's GitHub profile. The unit suite holds
+   `#fallback`, `llms.txt`, the JSON-LD, `security.txt` and the README intro
+   to `LINKS` and the greeting; the rest of the `<head>` and `og.png` are on
+   you.
 7. **Everything user-visible gets a test.** Core change → unit test. Behavior
    change → e2e test. A change with no test is half a change.
 
@@ -64,36 +64,31 @@ build.
 
 ```
 content/
-  index.html      the site: markup, styles, and the csh engine (core + shell)
-  404.html        terminal-styled, self-contained, zero JS
-  50x.html        same
-  llms.txt        briefing for AI agents crawling the site
-  robots.txt      points them at llms.txt
-  .well-known/security.txt  where to report a vulnerability (RFC 9116); the
-                  daily live check warns a month before it expires
-  assets/         og.png (social preview); CV/ is mounted from the server in
-                  production — the PDFs are never in this repo or image
+  index.html                the site: markup, styles, and the csh engine (core + shell)
+  404.html, 50x.html        terminal-styled, self-contained, zero JS
+  llms.txt                  briefing for AI agents crawling the site
+  robots.txt                points them at llms.txt
+  .well-known/security.txt  where to report a vulnerability (RFC 9116)
+  assets/                   og.png; CV/ is mounted in production, never committed
 conf/
-  default.conf    nginx: static files, caching, CORS block (legacy, leave it),
-                  404/50x
-  security-headers.inc  the response headers, declared once (see the nginx note)
-Dockerfile        pinned nginx + conf + content, file modes normalized
+  default.conf              nginx: static files, caching, CORS (legacy, leave it), 404/50x
+  security-headers.inc      the response headers, declared once (see the nginx note)
+Dockerfile                  pinned nginx + conf + content, file modes normalized
 test/
-  unit.test.js    pure core, headless node:vm, zero-dep hand-rolled runner
-  e2e.test.js     real Chromium via Playwright: boot, commands, keyboard and
-                  screen-reader access, mobile, no-JS
-.github/workflows/ci.yml  the suite, then the image: built once, smoke-tested,
-                  e2e against the container; from master, a job that runs
-                  no npm publishes those very bytes
-.github/workflows/production.yml  daily: the e2e suite against the live site
-.github/actions/chromium  installs Playwright's Chromium for both: short tries,
-                  three of them (apt mirrors stall)
-tools/make_og.py  regenerates assets/og.png when the card changes (Pillow)
-tools/make_favicon.py  regenerates favicon.ico + apple-touch-icon.png
-                  (favicon.svg is hand-written and the design's source of truth)
-AGENTS.md         you are here
-CLAUDE.md         Claude-specific working notes
-LICENSE           MIT for the code; the personal content is reserved (README)
+  unit.test.js              the core in a bare node:vm; zero-dep runner
+  e2e.test.js               real Chromium via Playwright; E2E_URL aims it at a server
+.github/
+  workflows/ci.yml          suites, then the image: built once, tested, published from master
+  workflows/production.yml  daily: the e2e suite against the live site
+  actions/chromium/         Playwright's Chromium, in three short tries
+  dependabot.yml            weekly grouped bumps: actions, nginx, Playwright
+tools/
+  make_og.py                regenerates assets/og.png (Pillow)
+  make_favicon.py           regenerates favicon.ico and apple-touch-icon.png from
+                            the design in favicon.svg, the source of truth
+AGENTS.md                   you are here
+CLAUDE.md                   Claude-specific notes
+LICENSE                     MIT for the code; the personal content is reserved (README)
 ```
 
 Inside index.html, top to bottom: meta/OG/JSON-LD → theme bootstrap →
@@ -114,10 +109,7 @@ titled THE ONE CLEVER TRICK in the source. It is load-bearing.
 - Develop by opening `content/index.html` in a browser. There is nothing to
   compile. `window.csh` is exposed (frozen) for console exploration.
 - `npm ci`, then `npx playwright install chromium` once, then `npm test` —
-  unit suite first (fast, no browser), e2e second (real Chromium). CI runs
-  the same on every push, then builds the image once and tests it — a smoke
-  test and the e2e suite against the container — and on master publishes
-  that very image.
+  unit suite first (fast, no browser), e2e second (real Chromium).
 - Error pages are deliberately self-contained duplicates of the aesthetic,
   not includes — they must render when everything else is on fire.
 - Every page carries its own Content-Security-Policy in a `<meta>`: its
@@ -127,9 +119,8 @@ titled THE ONE CLEVER TRICK in the source. It is load-bearing.
   it; never loosen the policy (no `'unsafe-inline'`) to make a test pass.
 - nginx note: `add_header` does not inherit into scopes that declare their
   own `add_header`, and the legacy CORS `if` blocks do. That is why
-  `conf/security-headers.inc` (X-Clacks-Overhead lives there) is included
-  twice in `conf/default.conf`. It is not a mistake; there is a comment;
-  leave both.
+  `conf/security-headers.inc` is included twice in `conf/default.conf`; the
+  served e2e run fails if either include goes.
 - `file://` sends no headers, so what only a server can get wrong is checked
   against a served copy: `E2E_URL=http://127.0.0.1:8080/ npm run test:e2e`
   with the image running (see README). CI does exactly that.

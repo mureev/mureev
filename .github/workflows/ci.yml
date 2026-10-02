@@ -8,16 +8,17 @@ on:
 permissions:
   contents: read
 
-# One run per branch at a time: a newer push waits for the running one instead
-# of racing it (and replaces a run still waiting), so :master only moves forward.
+# One run per branch at a time: a newer push waits for the running one
+# instead of racing it (and replaces a run still waiting), so :master only
+# moves forward.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: false
 
-# Every action is pinned to a full commit SHA (its release tag in the comment), so a
-# moved tag can't change what runs here; Dependabot proposes the updates weekly. The
-# runners are pinned too: ubuntu-latest turns into Ubuntu 26.04 from 2026-10-19, and
-# that move should be a commit, not a surprise.
+# Every action is pinned to a full commit SHA (its release tag in the
+# comment), so a moved tag can't change what runs here; Dependabot proposes
+# the updates weekly. The runners are pinned too: a new Ubuntu should arrive
+# as a commit, not a surprise.
 jobs:
   suite:
     name: unit + e2e
@@ -35,8 +36,9 @@ jobs:
       - uses: ./.github/actions/chromium
       - run: npm test
 
-  # Build once, test that image, ship that image: the build is set aside before any npm code runs,
-  # and publish — a job that runs none — ships that very image. This job can't push anything.
+  # Build once, test that image, ship that image: the build is set aside
+  # before any npm code runs, and publish — a job that runs none — ships it.
+  # This job can't push anything.
   image:
     name: image — build and test
     needs: suite
@@ -56,8 +58,7 @@ jobs:
             printf '%s\n' "$pdfs"; exit 1
           fi
       # Build from owner-only files (0600), the way a sync tool once left
-      # them: the Dockerfile's mode-normalizing layer has to earn its keep —
-      # in the very image that ships.
+      # them: the Dockerfile's chmod has to make the shipped image readable.
       - run: chmod -R go-rwx conf content
       - id: build
         run: |
@@ -71,20 +72,15 @@ jobs:
           retention-days: 3           # long enough to re-run a failed publish
           if-no-files-found: error
       - run: docker run -d --name site -p 8080:80 site
-      - name: Serve like production
+      # Up, and serving this site, before anything is installed to test it;
+      # the e2e run below checks every header, type and status.
+      - name: smoke test
         run: |
           set -eu
           B=http://127.0.0.1:8080
           for _ in $(seq 30); do curl -fsS -o /dev/null "$B/" && break; sleep 1; done
-          curl -fsS "$B/" | grep -q '@core-start'
-          curl -fsS "$B/llms.txt" | grep -q '^# Constantine Mureev'
-          curl -fsS -o /dev/null "$B/assets/og.png"
-          test "$(curl -sS -o 404.html -w '%{http_code}' "$B/no-such-page")" = 404
-          grep -q 'csh: 404:' 404.html
-          curl -fsS -o /dev/null -D - "$B/" | grep -qi '^x-clacks-overhead: GNU Terry Pratchett'
-          curl -sS -o /dev/null -D - "$B/no-such-page" | grep -qi '^x-clacks-overhead: GNU Terry Pratchett'
-          curl -fsS -o /dev/null -D - -H 'Accept-Encoding: gzip' "$B/" | grep -qi '^content-encoding: gzip'
-          docker exec site wget -q --spider http://127.0.0.1/
+          curl -fsS "$B/" | grep -q '@core-start'                # the page, not nginx's welcome
+          docker exec site wget -q --spider http://127.0.0.1/     # what the HEALTHCHECK runs
       # The e2e suite once more, aimed at the container: the real nginx, its
       # headers, types and caching, under the pages' own CSP.
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -100,11 +96,9 @@ jobs:
       - if: failure()
         run: docker logs site
 
-  # Delivery (2026-10-01): on master, the tested image goes to GHCR; veesp's docker-autoupdate
-  # ("continuous") sees the new :master digest within ~2 minutes, deploys it behind a health check
-  # through nginx and rolls back on failure. The image carries no CVs: they live only on the
-  # server, mounted read-only at /assets/CV. The only job holding a token that can deploy, and
-  # it runs no third-party code but the artifact download.
+  # On master only: the one job holding a token that can deploy, and it runs
+  # no third-party code but the artifact download. The server picks up a new
+  # :master within minutes.
   publish:
     name: publish to GHCR
     needs: image
@@ -131,8 +125,9 @@ jobs:
           echo "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
           docker tag site "$IMAGE:sha-${GITHUB_SHA::7}"
           docker push "$IMAGE:sha-${GITHUB_SHA::7}"
-          # :master follows master's head only — a re-run of an older commit must not roll it back.
-          # If the head can't be read, fail: better a red run than a silent non-deploy.
+          # :master follows master's head only: a re-run of an older commit
+          # must not roll it back. If the head can't be read, fail — better a
+          # red run than a silent non-deploy.
           head=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha)
           if [ "$head" != "$GITHUB_SHA" ]; then
             echo "::notice::master is at ${head::7} now and ships itself; this run published sha-${GITHUB_SHA::7} only"

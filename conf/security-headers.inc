@@ -10,7 +10,7 @@
 # third-party code runs here — the CSP sees to that — so they'd fence
 # nothing), Referrer-Policy (the browser's default is the right one).
 
-# Pages can't be framed: the one CSP directive a <meta> can't carry. Pages
+# Pages can't be framed: a CSP directive a <meta> can't carry. Pages
 # only — $frame_ancestors is empty for everything else, and an empty
 # add_header adds nothing.
 add_header Content-Security-Policy $frame_ancestors always;

@@ -1,4 +1,4 @@
 .DS_Store
 node_modules/
-# The CV PDFs never enter the repo or the image: production mounts them from the server.
+# CVs: production mounts them; never commit them.
 content/assets/CV/*.pdf

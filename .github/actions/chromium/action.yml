@@ -1,8 +1,7 @@
 name: Chromium for the e2e suite
 description: >-
-  Playwright's headless Chromium and the system libraries it needs. apt mirrors
-  and the browser download stall now and then — once for ten minutes, until the
-  job's limit cancelled it — so each try gets three minutes, and there are three.
+  Playwright's headless Chromium and its system libraries, in three tries of
+  three minutes: apt mirrors and the download stall now and then.
 runs:
   using: composite
   steps:
