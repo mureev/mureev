@@ -12,10 +12,8 @@
      AGENTS.md in the repo (github.com/mureev/mureev); agents crawling
      the site have a briefing at /llms.txt.
 
-     Architecture: functional core, imperative shell. The pure logic between
-     the @core markers below runs headless in the unit suite; the DOM adapter
-     wraps around it. `npm test` runs both suites. Change the core — change
-     a test.
+     The engine is the last <script>: a functional core, an imperative
+     shell. Change the core — change a test.
 -->
 <html lang="en">
 <head>
@@ -23,7 +21,7 @@
     <!-- Only this file's own code runs here: each inline <script> and <style>
          is allowed by its sha256, and no string becomes markup (Trusted Types).
          Edit one, and the unit suite prints this tag's new policy. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-l55IYmFnhKIP8ZE54fgSqZb4Grdl+irV5CqiGRxN6KY='; style-src 'sha256-ceoIwWvacM5dW0CoGTPnRLyiSKOyP+tHrHfZitQEuaQ='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-bvYVbZvPOc5pLcvzApxHreozMnYO0ySI8rBeBB4/Zls='; style-src 'sha256-eqPT3sKuMfHYOsHEZ3+5HGxV9HSdwindRpK+m5vOQLA='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -31,7 +29,7 @@
     <title>Constantine Mureev — Engineering Leader</title>
     <meta name="description" content="Personal site of Constantine Mureev — engineering leader shaping fintech at Renmoney. Yoshkar-Ola, Russia. Boots straight into a terminal; type help.">
     <link rel="canonical" href="https://mureev.com/">
-    <!-- Favicon: hand-written SVG first (the cursor blinks in Firefox tabs),
+    <!-- Favicon: hand-rolled SVG first (the cursor blinks in Firefox tabs),
          pixel-tuned ICO for everyone else, PNG for iOS home screens. -->
     <link rel="icon" href="/favicon.svg" type="image/svg+xml">
     <link rel="icon" href="/favicon.ico" sizes="48x48 32x32 16x16">
@@ -166,8 +164,9 @@
         .sw { display: inline-block; width: 2.2ch; height: 1em; vertical-align: text-bottom; }
 
         /* the hidden keyboard sink — see THE ONE CLEVER TRICK in the script.
-           Absolute, no offsets: it stays where the flow puts it, under the
-           prompt, without taking up room there. */
+           Absolute, no offsets: it sits where the flow puts it, under the
+           prompt, taking no room — so a phone that scrolls it into view
+           above the keyboard brings the prompt along. */
         #kbd {
             position: absolute;
             width: 2px; height: 2px;
@@ -289,12 +288,13 @@
     /* =====================================================================
        csh — the Constantine shell
 
-       Hand-written vanilla JS. Two layers, one file:
+       Hand-rolled vanilla JS. Two layers, one file:
 
          CORE   pure logic — parsing, history, completion, the command
                 registry. Commands return *descriptions* of output (Blocks),
-                never DOM. No document, no window, no clock of its own.
-                Runs headless in test/unit.test.js via the @core markers.
+                never DOM. No document, no window, no clock of its own:
+                test/unit.test.js cuts it out by the @core markers and runs
+                it in a bare node:vm, so DOM access in here fails the suite.
 
          SHELL  the imperative rind — renders Blocks into DOM, mirrors the
                 keyboard sink into the prompt row, performs effects
@@ -308,11 +308,6 @@
                                      applyBlocks → DOM
        ===================================================================== */
 
-    /* =====================================================================
-       CORE — pure. The unit suite extracts everything between the @core
-       markers and runs it in a bare node:vm. If you add DOM access in
-       here, the suite fails — on purpose.
-       ===================================================================== */
     /* @core-start */
 
     const VERSION = '3.2.0';
@@ -465,13 +460,7 @@
 
     /* -----------------------------------------------------------------
        The registry. Every command: { d: one-line description,
-       run(arg, ctx) → Block[] }. Commands are pure — they *describe*
-       output; the shell performs it. That's why the unit suite can
-       assert on every command without a browser.
-
-       Scope note (see AGENTS.md): the visible command set is a decision,
-       not an accident. The owner declined a deeper easter-egg drawer —
-       don't add commands without his sign-off.
+       run(arg, ctx) → Block[] }. Eleven, on purpose: AGENTS.md rule 5.
        ----------------------------------------------------------------- */
     const COMMANDS = {
         help: {
@@ -567,8 +556,7 @@
 
     /* @core-end */
     /* =====================================================================
-       SHELL — the imperative rind. Everything below touches the DOM;
-       nothing below decides *what* to say.
+       SHELL — the imperative rind. Everything below touches the DOM.
        ===================================================================== */
 
     const $id  = (i) => document.getElementById(i);
@@ -715,8 +703,6 @@
        semantics for free — we merely *mirror* its value and caret into
        the styled prompt row on every change. ~40 lines instead of a
        2,000-line keyboard layer. That's the trade, and it's a good one.
-       It sits right under the prompt, too: a phone that scrolls its
-       focused field above the keyboard brings the prompt along.
        -------------------------------------------------------------------- */
 
     function render() {

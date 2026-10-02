@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
   <!-- mureev.com — the terminal, at sixteen pixels.
-       Hand-written SVG, like everything else here.
+       Hand-rolled SVG, like everything else here.
        The cursor blinks in browsers that animate favicons (Firefox);
        everywhere else it's simply lit. Both are correct. -->
   <rect width="64" height="64" rx="9" fill="#0a0e0b"/>
