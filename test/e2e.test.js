@@ -151,6 +151,18 @@ const watch = (p) => {
     await kp.waitForFunction(() => document.querySelector('#out').innerText.includes('motd'));
     const { renmoney, themes } = await kp.evaluate(() => ({ renmoney: csh.LINKS.renmoney, themes: [...csh.THEMES] }));
 
+    /* what a screen reader can reach once the boot is over: the greeting,
+       its link and its command — and nothing hidden but the ASCII logo */
+    const readable = async (pg) => {
+        const tree = await pg.locator('#out').ariaSnapshot();
+        const hidden = await pg.evaluate(() => [...document.querySelectorAll('#out [aria-hidden="true"]')].map((n) => n.className));
+        return { ok: tree.includes("G'day, I'm Constantine Mureev.") && tree.includes('link "Renmoney"') &&
+            tree.includes('button "help"') && JSON.stringify(hidden) === '["logo"]', hidden };
+    };
+    const skipped = await readable(kp);
+    check('a skipped boot leaves the whole greeting to screen readers — only the logo is hidden',
+        skipped.ok, JSON.stringify(skipped.hidden));
+
     const focused = () => kp.evaluate(() => {
         const a = document.activeElement;
         return a.id || (a.matches('a') ? 'link:' : a.matches('.cmd') ? 'cmd:' : a.tagName + ':') + a.textContent.trim();
@@ -288,8 +300,12 @@ const watch = (p) => {
     await sr.goto(URL);
     await sr.waitForFunction(() => document.querySelector('#out').innerText.includes('motd'), null, { timeout: 15000 });
     const updates = await sr.evaluate(() => window.__updates);
+    const greeting = await sr.evaluate(() => window.csh.GREETING.length);
     check('screen readers hear the boot line by line, not keystroke by keystroke',
-        updates > 0 && updates <= (await sr.evaluate(() => window.csh.GREETING.length)) + 2, updates + ' live updates');
+        updates >= greeting && updates <= greeting + 2, updates + ' live updates for ' + greeting + ' lines');
+    const watched = await readable(sr);
+    check('…and once it is typed out, all of it stays readable — only the logo is hidden',
+        watched.ok, JSON.stringify(watched.hidden));
     await sr.close();
 
     const rm = watch(await ax.newPage());
@@ -456,6 +472,10 @@ const watch = (p) => {
             const days = await Promise.all(hosts.map(daysLeft));
             check('every hostname: a valid certificate, two weeks from expiry or more',
                 days.every((d) => d >= 14), hosts.map((h, i) => `${h}: ${days[i]}d`).join(', '));
+            const expires = /^Expires: *(.+)$/m.exec(await at('/.well-known/security.txt').text());
+            const left = expires ? Math.floor((Date.parse(expires[1]) - Date.now()) / 864e5) : NaN;
+            check('security.txt is good for another month at least (RFC 9116: Expires)',
+                left > 30, `${left} days left: set Expires to just under a year from today`);
             const LINKS = await page.evaluate(() => csh.LINKS);
             const cvs = await Promise.all([LINKS.cvEn, LINKS.cvRu].map((u) => http.head(u)));
             check('both CVs are served (the server mounts them; the image never has them)',

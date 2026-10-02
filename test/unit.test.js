@@ -384,12 +384,15 @@ test('the command set is the approved eleven (AGENTS.md rule 5 — change only w
         'neofetch', 'theme', 'clear', 'thisistheway']));
 test('the themes are the approved five', () =>
     eq(csh.THEMES, ['green', 'amber', 'mono', 'crt', 'flat']));
-test('security.txt: the site\'s email, and an Expires date 30–366 days out (RFC 9116)', () => {
+test('security.txt: the site\'s email, and an Expires date at most a year out (RFC 9116)', () => {
     const txt = fs.readFileSync(path.join(__dirname, '..', 'content', '.well-known', 'security.txt'), 'utf8');
     const field = (name) => (new RegExp('^' + name + ': *(.+)$', 'm').exec(txt) || [])[1];
     eq(field('Contact'), csh.LINKS.email);
-    const days = (Date.parse(field('Expires')) - Date.now()) / 864e5;   // the one test with a calendar, on purpose
-    ok(days > 30 && days <= 366, `Expires is ${Math.round(days)} days away: set it to just under a year from today`);
+    /* Only an upper bound here: time can't break it, so it never blocks a
+       deploy. The month's warning before Expires comes from the daily check
+       of the live site (production.yml). */
+    const days = (Date.parse(field('Expires')) - Date.now()) / 864e5;
+    ok(days <= 366, `Expires is ${Math.round(days)} days away: RFC 9116 wants under a year`);
 });
 test('JSON-LD parses and says what the terminal says', () => {
     const m = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
@@ -457,6 +460,15 @@ const JS_TYPE = /^(module|(text|application)\/(x-)?(java|ecma)script)$/i;
 const sha256  = (s) => `'sha256-${createHash('sha256').update(s.replace(/\r\n?/g, '\n')).digest('base64')}'`;
 const policyOf = (content) => new Map(content.split(';').map((d) => d.trim().split(/\s+/))
     .filter(([name]) => name).map(([name, ...sources]) => [name, sources]));
+/* Everything but the hashes, pinned per page: loosening a policy is a
+   decision, so it has to be made here too. */
+const GIF_ORIGIN = new URL(csh.LINKS.gif).origin;
+const DENIED = "base-uri 'none'; form-action 'none'";
+const REST = {
+    'index.html': `img-src 'self' ${GIF_ORIGIN}; ${DENIED}; require-trusted-types-for 'script'; trusted-types 'none'`,
+    '404.html':   `img-src 'self'; ${DENIED}`,
+    '50x.html':   `img-src 'self'; ${DENIED}`
+};
 for (const f of fs.readdirSync(CONTENT).filter((n) => n.endsWith('.html')).sort()) {
     const page = fs.readFileSync(path.join(CONTENT, f), 'utf8');
     const metas = [...page.matchAll(/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/g)];
@@ -474,19 +486,12 @@ for (const f of fs.readdirSync(CONTENT).filter((n) => n.endsWith('.html')).sort(
         ok(metas.length === 1 && metas[0].index < firstBlock,
             metas.length === 1 ? 'the CSP <meta> must come before the first <script> or <style>' : `${metas.length} CSP <meta> tags`));
     if (metas.length !== 1) continue;
-    const policy = policyOf(metas[0][1]);
-    test(`${f}: script-src and style-src allow its inline blocks, by hash, and nothing else`, () => {
-        const fixed = new Map(policy);
-        for (const [dir, hashes] of Object.entries(want)) {
-            if (hashes.length) fixed.set(dir, hashes); else fixed.delete(dir);
-        }
-        const line = [...fixed].map(([d, s]) => [d, ...s].join(' ')).join('; ');
-        ok(line === [...policy].map(([d, s]) => [d, ...s].join(' ')).join('; '),
-            `inline code changed; paste this as the CSP <meta> content in ${f}:\n      ${line}`);
-    });
-    test(`${f}: everything else is denied — no base, no forms, no default sources`, () => {
-        for (const d of ['default-src', 'base-uri', 'form-action']) eq(policy.get(d), ["'none'"], d);
-        ok(![...policy.values()].flat().some((s) => /unsafe|^\*$|^(data|blob|https?):$/.test(s)), 'a wildcard or unsafe- source');
+    test(`${f}: the policy is its inline code, by hash, and nothing else — every other door shut`, () => {
+        ok(REST[f], `a new page: give it a policy in REST, in this file`);
+        const line = ["default-src 'none'",
+            ...Object.entries(want).filter(([, hashes]) => hashes.length).map(([dir, hashes]) => [dir, ...hashes].join(' ')),
+            REST[f]].join('; ');
+        ok(metas[0][1] === line, `paste this as the CSP <meta> content in ${f}:\n      ${line}`);
     });
 }
 const INDEX_POLICY = policyOf((/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html) || [])[1] || '');
@@ -528,8 +533,9 @@ test('the GitHub profile intro (top of README.md) names what the greeting links 
     for (const name of linked) ok(intro.includes(name), name + ' missing from the README profile intro');
 });
 test('no Trojan Source: no bidi controls or invisible characters in any text file', () => {
-    const ROOT = path.join(__dirname, '..'), hidden = /[\u202A-\u202E\u2066-\u2069\u200B\u200C\u200E\u200F\uFEFF]/;
-    const TEXT = /\.(html|txt|md|js|py|ya?ml|conf|inc|json)$|^(Dockerfile|LICENSE|\.[a-z]+ignore)$/;
+    // every format character (bidi controls, zero-widths, the BOM, soft hyphens…) and the Hangul fillers
+    const ROOT = path.join(__dirname, '..'), hidden = /[\p{Cf}\u115F\u1160\u3164\uFFA0]/u;
+    const TEXT = /\.(html|txt|md|js|py|ya?ml|conf|inc|json|svg)$|^(Dockerfile|LICENSE|\.[a-z]+ignore)$/;
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
         e.name === '.git' || e.name === 'node_modules' ? []
             : e.isDirectory() ? walk(path.join(dir, e.name))

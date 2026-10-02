@@ -69,8 +69,8 @@ content/
   50x.html        same
   llms.txt        briefing for AI agents crawling the site
   robots.txt      points them at llms.txt
-  .well-known/security.txt  where to report a vulnerability (RFC 9116); its
-                  Expires date has a test that fails a month ahead
+  .well-known/security.txt  where to report a vulnerability (RFC 9116); the
+                  daily live check warns a month before it expires
   assets/         og.png (social preview); CV/ is mounted from the server in
                   production — the PDFs are never in this repo or image
 conf/
