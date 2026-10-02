@@ -47,6 +47,24 @@ The full contract lives in [AGENTS.md](AGENTS.md). The short version:
 4. Functional core, imperative shell — the pure logic runs headless in `node:vm`.
 5. The copy is the owner's voice. The Mandalorian stays.
 
+### What checks it
+
+A promise nobody checks is a wish. Each of these has a check behind it,
+and a red build when it stops being true:
+
+| Promise | Checked by |
+| --- | --- |
+| One file, nothing loaded from elsewhere | unit: no `<script src>` or stylesheet link on any page · e2e: no request leaves the site but the gif |
+| ≤ 48 KB raw, ≤ 14 KB gzipped | unit: the size budget |
+| A pure core | unit: the core runs in a bare `node:vm` — no DOM to reach for |
+| Strangers' input can't break it | unit: a table of hostile input against every command, thousands of seeded lines, a history walked ten thousand times |
+| Nothing runs that didn't ship | unit: each page's CSP is exactly its inline code's hashes · e2e: not one CSP or Trusted Types violation, on any page |
+| Readable in every theme | unit: WCAG AA contrast, measured from the CSS itself |
+| Usable by keyboard and screen reader | e2e: the Tab walk, focus rings, landmarks, what the live region announces |
+| Fine without JavaScript, and on a phone | e2e: the no-JS fallback · a touch viewport: the boot, taps, the on-screen keyboard |
+| What ships is what was tested | CI: one image, smoke-tested and run through the e2e suite, then published |
+| The live site stays that way | daily: the e2e suite against mureev.com, plus certificates and the CVs |
+
 ### Run it
 
 ```sh
