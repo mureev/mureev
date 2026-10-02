@@ -75,15 +75,17 @@ never enter this repo or the image: production mounts them from the server.
 npm ci                             # Playwright, the only devDependency
 npx playwright install chromium    # once: the browser the e2e suite drives
 npm test                           # unit (headless core, zero-dep runner) + e2e (real Chromium)
+E2E_URL=http://127.0.0.1:8080/ npm run test:e2e   # e2e against the running image: headers, caching, errors
 ```
 
 The unit suite slices the engine's pure core out of `index.html` by its
 `@core` markers and runs it with no DOM at all; the e2e suite boots the real
 page in Chromium and types at it like a visitor would — including
 keyboard-only use, what a screen reader is told, a mobile viewport and a
-JavaScript-disabled pass. CI runs both on every push, plus a smoke test of
-the built image — built from owner-only (0600) files, so the Dockerfile's
-permission fix has to keep earning its place.
+JavaScript-disabled pass. CI runs both on every push; it also builds the
+image from owner-only (0600) files — so the Dockerfile's permission fix has
+to keep earning its place — and runs the e2e suite again against the
+container.
 
 ### Map
 
@@ -92,9 +94,9 @@ permission fix has to keep earning its place.
 | `content/index.html` | the site — markup, styles, and the `csh` engine |
 | `content/404.html`, `50x.html` | error pages, self-contained, zero JS |
 | `content/llms.txt` | briefing for AI agents |
-| `conf/default.conf` | nginx (note the X-Clacks-Overhead) |
+| `conf/` | nginx, and the response headers (note the X-Clacks-Overhead) |
 | `test/` | unit + e2e suites |
-| `.github/workflows/ci.yml` | the suites + an image smoke test on every push; publishes the image from `master` |
+| `.github/workflows/ci.yml` | the suites, plus the image's smoke test and e2e, on every push; publishes the image from `master` |
 | `tools/` | generators for `og.png` and the favicons |
 | `AGENTS.md` / `CLAUDE.md` | the contract for whoever builds next |
 

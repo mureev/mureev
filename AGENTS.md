@@ -70,13 +70,17 @@ content/
   robots.txt      points them at llms.txt
   assets/         og.png (social preview); CV/ is mounted from the server in
                   production — the PDFs are never in this repo or image
-conf/default.conf nginx: static files, CORS block (legacy, leave it), 404/50x
+conf/
+  default.conf    nginx: static files, caching, CORS block (legacy, leave it),
+                  404/50x
+  security-headers.inc  the response headers, declared once (see the nginx note)
 Dockerfile        pinned nginx + conf + content, file modes normalized
 test/
   unit.test.js    pure core, headless node:vm, zero-dep hand-rolled runner
   e2e.test.js     real Chromium via Playwright: boot, commands, keyboard and
                   screen-reader access, mobile, no-JS
-.github/workflows/ci.yml  the suite + an image smoke test, on every push
+.github/workflows/ci.yml  the suite, plus the image's smoke test and e2e
+                  against the container, on every push
 tools/make_og.py  regenerates assets/og.png when the card changes (Pillow)
 tools/make_favicon.py  regenerates favicon.ico + apple-touch-icon.png
                   (favicon.svg is hand-written and the design's source of truth)
@@ -114,8 +118,12 @@ titled THE ONE CLEVER TRICK in the source. It is load-bearing.
   it; never loosen the policy (no `'unsafe-inline'`) to make a test pass.
 - nginx note: `add_header` does not inherit into scopes that declare their
   own `add_header`, and the legacy CORS `if` blocks do. That is why
-  X-Clacks-Overhead appears twice in `conf/default.conf`. It is not a
-  mistake; there is a comment; leave both.
+  `conf/security-headers.inc` (X-Clacks-Overhead lives there) is included
+  twice in `conf/default.conf`. It is not a mistake; there is a comment;
+  leave both.
+- `file://` sends no headers, so what only a server can get wrong is checked
+  against a served copy: `E2E_URL=http://127.0.0.1:8080/ npm run test:e2e`
+  with the image running (see README). CI does exactly that.
 
 ## History, or why the caution
 

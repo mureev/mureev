@@ -12,11 +12,14 @@
    ========================================================================= */
 'use strict';
 
-const { chromium } = require('playwright');
+const { chromium, request } = require('playwright');
 const path = require('path');
 
-// the page under test (the WHATWG URL class, where needed, is globalThis.URL)
-const URL = 'file://' + path.resolve(__dirname, '..', 'content', 'index.html');
+/* The page under test: the file itself, or — with E2E_URL — a served copy
+   (CI aims it at the built image: same suite, plus what only a server can
+   get wrong — headers, types, caching, errors). The WHATWG URL class,
+   where needed, is globalThis.URL. */
+const URL = process.env.E2E_URL || 'file://' + path.resolve(__dirname, '..', 'content', 'index.html');
 
 let passed = 0;
 const failures = [];
@@ -139,7 +142,8 @@ const watch = (p) => {
     console.log('\nkeyboard & screen readers');
     const ax = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     await ax.grantPermissions(['clipboard-read', 'clipboard-write']);
-    await ax.route(/^https?:/, (r) => r.fulfill({ body: '' }));   // links get followed; nothing leaves the machine
+    const away = (u) => /^https?:$/.test(u.protocol) && u.origin !== new globalThis.URL(URL).origin;
+    await ax.route(away, (r) => r.fulfill({ body: '' }));   // links get followed; nothing leaves the machine
     const kp = watch(await ax.newPage());
     await kp.goto(URL);
     await kp.keyboard.press('Escape');
@@ -354,6 +358,38 @@ const watch = (p) => {
         check(`${name}.html renders styled, inside its own CSP`, await ep.evaluate(() =>
             getComputedStyle(document.body).backgroundColor === 'rgb(10, 14, 11)' && document.body.innerText.includes('mureev.com')));
         await ep.close();
+    }
+
+    /* ---------- served like production (E2E_URL only) ---------- */
+    if (/^https?:/.test(URL)) {
+        console.log('\nserved like production  (' + URL + ')');
+        const http = await request.newContext({ baseURL: URL, maxRedirects: 0 });
+        const one = (r, name) => r.headersArray().filter((h) => h.name.toLowerCase() === name).map((h) => h.value);
+        const PAGES = ['/', '/no-such-page', '/assets/'], FILES = ['/assets/og.png', '/llms.txt'];
+        const heads = [];
+        for (const p of [...PAGES, ...FILES]) heads.push([p, await http.get(p)]);
+        heads.push(['HEAD /', await http.head('/')]);
+        for (const [p, r] of heads) {
+            const page = !FILES.includes(p);
+            const want = { 'x-content-type-options': ['nosniff'], 'x-clacks-overhead': ['GNU Terry Pratchett'],
+                'content-security-policy': page ? ["frame-ancestors 'none'"] : [], 'strict-transport-security': [] };
+            const got = Object.fromEntries(Object.keys(want).map((k) => [k, one(r, k)]));
+            check(`${p}: its headers, each exactly once${page ? '' : ' (no framing rule: not a page)'}`,
+                JSON.stringify(got) === JSON.stringify(want) && r.headers().server === 'nginx', JSON.stringify(got));
+        }
+        const at = (p) => heads.find(([q]) => q === p)[1];
+        check('pages revalidate on every visit; images keep for a day',
+            at('/').headers()['cache-control'] === 'no-cache' && at('/assets/og.png').headers()['cache-control'] === 'max-age=86400');
+        check('text says it is utf-8 (llms.txt: em dashes, Cyrillic)',
+            at('/llms.txt').headers()['content-type'] === 'text/plain; charset=utf-8');
+        check('gzip, and Vary says so', at('/').headers()['content-encoding'] === 'gzip' && /accept-encoding/i.test(at('/').headers().vary));
+        check('a missing page or a bare directory: the terminal 404, status 404',
+            (await Promise.all(['/no-such-page', '/assets/'].map(async (p) =>
+                at(p).status() === 404 && (await at(p).text()).includes('csh: 404:')))).every(Boolean));
+        const slash = await http.get('/assets');
+        check('the trailing-slash redirect stays relative (so on https behind the proxy)',
+            slash.status() === 301 && slash.headers().location === '/assets/', slash.status() + ' → ' + slash.headers().location);
+        await http.dispose();
     }
 
     /* ---------- the whole session ---------- */

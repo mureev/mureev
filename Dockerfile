@@ -11,9 +11,10 @@ LABEL org.opencontainers.image.title="mureev.com" \
       org.opencontainers.image.authors="constantine@mureev.com"
 
 # conf first: it changes rarely, content changes often — this order keeps
-# the conf layer cached across content edits. COPY overwrites the stock
-# default.conf in place.
-COPY --chmod=644 conf/default.conf /etc/nginx/conf.d/default.conf
+# the conf layer cached across content edits. conf/ lands in conf.d/:
+# default.conf overwrites the stock one in place, and security-headers.inc
+# rides along — not *.conf, so nginx reads it only where it's included.
+COPY --chmod=644 conf/ /etc/nginx/conf.d/
 COPY content /usr/share/nginx/html
 
 # Normalize modes. COPY keeps the build context's permission bits, and a
