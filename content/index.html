@@ -81,7 +81,8 @@
            Phosphor. Default theme is green; amber/mono/crt/flat via the
            `theme` command (persisted in localStorage when allowed).
            Themes are pure CSS: one data-theme attribute on <html>, zero
-           JS involvement beyond setting it.
+           JS involvement beyond setting it. Every --fg* clears WCAG AA
+           (4.5:1) on its --bg; the unit suite measures it.
            --------------------------------------------------------------- */
         :root {
             --bg:      #0a0e0b;
@@ -93,18 +94,18 @@
             --mono:    ui-monospace, "SF Mono", Menlo, Consolas, "DejaVu Sans Mono", monospace;
         }
         html[data-theme="amber"] {
-            --bg: #0e0a04; --fg: #ffb000; --fg-dim: rgba(255, 176, 0, .55);
+            --bg: #0e0a04; --fg: #ffb000; --fg-dim: rgba(255, 176, 0, .62);
             --fg-hi: #ffe9c4; --glow: 0 0 6px rgba(255, 176, 0, .38);
         }
         html[data-theme="mono"] {
-            --bg: #050505; --fg: #d8d8d8; --fg-dim: rgba(216, 216, 216, .5);
+            --bg: #050505; --fg: #d8d8d8; --fg-dim: rgba(216, 216, 216, .55);
             --fg-hi: #ffffff; --glow: 0 0 5px rgba(255, 255, 255, .22);
         }
         html[data-theme="crt"] {
             --scan: .22;
         }
         html[data-theme="flat"] {
-            --bg: #000000; --fg: #d8d8d8; --fg-dim: rgba(216, 216, 216, .5);
+            --bg: #000000; --fg: #d8d8d8; --fg-dim: rgba(216, 216, 216, .55);
             --fg-hi: #ffffff; --glow: none; --scan: 0;
         }
 
@@ -123,6 +124,7 @@
 
         a { color: var(--fg-hi); text-decoration: underline; text-underline-offset: 3px; }
         a:hover, .cmd:hover { background: var(--fg); color: var(--bg); text-shadow: none; }
+        a:focus-visible, .cmd:focus-visible { outline: 2px solid var(--fg-hi); outline-offset: 2px; }
 
         .hi   { color: var(--fg-hi); }
         .dim  { color: var(--fg-dim); }
@@ -147,6 +149,13 @@
             animation: blink 1.1s steps(1) infinite;
         }
         @keyframes blink { 50% { background: transparent; color: var(--fg); } }
+        /* Focus is elsewhere — a link, the page, a tap not yet made: the
+           block goes hollow and holds still, as terminal emulators do. The
+           textarea is invisible, so this block is its focus indicator. */
+        #term:not(:has(#kbd:focus)) #cursor {
+            background: transparent; color: inherit;
+            box-shadow: inset 0 0 0 1px var(--fg); animation: none;
+        }
 
         /* neofetch */
         .neo { display: flex; gap: 3ch; align-items: flex-start; flex-wrap: wrap; margin: .4em 0; }
@@ -193,6 +202,16 @@
         @media (prefers-reduced-motion: reduce) {
             #cursor { animation: none; }
             #fx, #fx::before { animation: none !important; }
+        }
+        /* Asked for more contrast? No glow, no glass. Forced colors (Windows
+           High Contrast): the OS owns the palette and drops the glass itself,
+           but it paints the block cursor away — so outline the cell instead. */
+        @media (prefers-contrast: more) {
+            body { text-shadow: none; }
+            #fx { display: none; }
+        }
+        @media (forced-colors: active) {
+            #cursor { outline: 2px solid; outline-offset: -2px; }
         }
 
         /* ---- no-JS fallback: the terminal, pre-recorded ---- */
@@ -241,20 +260,21 @@
         <p class="dim">// JavaScript is off — the interactive terminal needs it. The facts above don't.</p>
     </main>
 
-    <!-- The terminal. #out is the scrollback; #row is the live input line,
-         mirrored from the hidden textarea below. -->
-    <div id="term" role="application" aria-label="Interactive terminal — Constantine Mureev">
-        <div id="out" aria-live="polite"></div>
-        <div id="row"><span class="ps1" id="ps1"></span><span id="pre"></span><span id="cursor">&nbsp;</span><span id="post"></span></div>
+    <!-- The terminal. #out is the scrollback, a log screen readers can
+         browse and hear grow; #row is the live input line, mirrored from
+         the hidden textarea below — eyes only, since the textarea itself
+         is what assistive tech reads. Without JS, all of it stays hidden. -->
+    <div id="term" role="main" aria-label="Interactive terminal — Constantine Mureev">
+        <div id="out" role="log" aria-live="polite"></div>
+        <div id="row" aria-hidden="true"><span class="ps1" id="ps1"></span><span id="pre"></span><span id="cursor">&nbsp;</span><span id="post"></span></div>
+        <textarea id="kbd" autocapitalize="off" autocomplete="off" spellcheck="false"
+                  enterkeyhint="go" aria-label="Terminal input"></textarea>
     </div>
-
-    <textarea id="kbd" autocapitalize="off" autocomplete="off" spellcheck="false"
-              enterkeyhint="go" aria-label="Terminal input"></textarea>
 
     <script>
     'use strict';
     /* =====================================================================
-       csh — the Constantine shell — v3.0.0
+       csh — the Constantine shell
 
        Hand-written vanilla JS. Two layers, one file:
 
@@ -589,9 +609,13 @@
         const logo = document.createElement('pre');
         logo.className = 'logo';
         logo.textContent = LOGO;
+        logo.setAttribute('aria-hidden', 'true');     // box-drawing art: eyes only
         const info = document.createElement('pre');
         const hi = (s) => { const n = document.createElement('span'); n.className = 'hi'; n.textContent = s; return n; };
-        info.append(hi(spec.title), '\n' + '─'.repeat(22) + '\n');
+        const rule = document.createElement('span');
+        rule.textContent = '─'.repeat(22);
+        rule.setAttribute('aria-hidden', 'true');
+        info.append(hi(spec.title), '\n', rule, '\n');
         for (const [label, val] of spec.fields) {
             info.append(hi(label.padEnd(10)));
             for (const p of (Array.isArray(val) ? val : [val])) info.append(partNode(p));
@@ -698,7 +722,7 @@
         if (k === 'Enter')          { e.preventDefault(); exec(kbd.value); }
         else if (k === 'ArrowUp')   { e.preventDefault(); const v = hist.prev(kbd.value); if (v !== null) setLine(v); }
         else if (k === 'ArrowDown') { e.preventDefault(); const v = hist.next(); if (v !== null) setLine(v); }
-        else if (k === 'Tab') {
+        else if (k === 'Tab' && !e.shiftKey) {        // Shift+Tab is the way out, up into the output
             e.preventDefault();
             const r = complete(kbd.value, Object.keys(COMMANDS));
             if (r?.set) setLine(r.set);
@@ -719,17 +743,21 @@
 
     /* Focus routing: physical keys land in the sink even if focus wandered;
        taps focus it too — but never at the price of a text selection or a
-       link click. The terminal should feel inevitable, not grabby. */
+       link click. Tab is the browser's, and a focused link or command keeps
+       its own keys (Enter, Space, arrows); only typing jumps to the prompt.
+       The terminal should feel inevitable, not grabby. */
     const focus = () => kbd.focus({ preventScroll: true });
     document.addEventListener('keydown', (e) => {
         if (booting) { skipBoot = true; return; }
-        if (e.target !== kbd && !e.metaKey && !e.ctrlKey && !e.altKey && e.key.length === 1) {
+        if (e.target === kbd || e.key === 'Tab') return;
+        const own = e.target.closest?.('a, .cmd');
+        if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key.length === 1 && !(own && e.key === ' ')) {
             focus();
             kbd.setRangeText(e.key, kbd.selectionStart ?? kbd.value.length,
                              kbd.selectionEnd ?? kbd.value.length, 'end');
             e.preventDefault();
             render(); scroll();
-        } else if (e.target !== kbd) {
+        } else if (!own && !String(window.getSelection() || '')) {   // let people copy
             focus();
         }
     });
@@ -743,7 +771,7 @@
     });
     out.addEventListener('keydown', (e) => {
         const c = e.target.closest?.('.cmd');
-        if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); exec(c.dataset.cmd); }
+        if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); exec(c.dataset.cmd); focus(); }
     });
 
     /* ---------- boot ----------------------------------------------------- */
@@ -752,11 +780,13 @@
 
     /** Types a greeting line character by character, then swaps in the
         rich (linked) version. Any key or tap skips the theater — never
-        make a visitor wait for a cursor. */
+        make a visitor wait for a cursor. The theater is for eyes only:
+        screen readers hear each finished line once, not every keystroke. */
     async function typeLine(parts) {
         if (!parts.length) { blank(); return; }
         const text = parts.map((p) => typeof p === 'string' ? p : p.t).join('');
         const div = line('');
+        div.setAttribute('aria-hidden', 'true');
         for (let i = 1; i <= text.length; i++) {
             if (skipBoot || instant) break;
             div.textContent = text.slice(0, i);
@@ -767,11 +797,12 @@
         const rich = line(parts); rich.remove();      // (built off-screen)
         div.append(...rich.childNodes);
         div.className = rich.className;
+        div.removeAttribute('aria-hidden');
         scroll();
     }
 
     (async function boot() {
-        pre(LOGO, 'logo');
+        pre(LOGO, 'logo').setAttribute('aria-hidden', 'true');
         for (const l of GREETING) await typeLine(l);
         blank();
         /* motd prints where a real login puts it — last, right before the

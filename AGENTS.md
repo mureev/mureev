@@ -74,7 +74,8 @@ conf/default.conf nginx: static files, CORS block (legacy, leave it), 404/50x
 Dockerfile        pinned nginx + conf + content, file modes normalized
 test/
   unit.test.js    pure core, headless node:vm, zero-dep hand-rolled runner
-  e2e.test.js     real Chromium via Playwright: boot, commands, mobile, no-JS
+  e2e.test.js     real Chromium via Playwright: boot, commands, keyboard and
+                  screen-reader access, mobile, no-JS
 .github/workflows/ci.yml  the suite + an image smoke test, on every push
 tools/make_og.py  regenerates assets/og.png when the card changes (Pillow)
 tools/make_favicon.py  regenerates favicon.ico + apple-touch-icon.png

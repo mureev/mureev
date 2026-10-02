@@ -366,6 +366,45 @@ test('JSON-LD parses and says what the terminal says', () => {
         ok(ld.sameAs.includes(csh.LINKS[k]), k + ' missing from sameAs');
 });
 
+/* ---------- legibility ---------------------------------------------------------
+   WCAG 2 AA: text this size needs 4.5:1 against its background, in every
+   theme — read from the CSS tokens themselves, so a palette tweak can't
+   quietly undo it. Dim text is translucent phosphor: composite it over the
+   background first, rounding down to 8 bits (dimmer: the worst case). The
+   CRT glass above — scanlines, vignette — dims text and background alike;
+   it is decoration, and `prefers-contrast: more` takes it away. */
+console.log('\nlegibility  (WCAG 2 AA, measured from the CSS tokens)');
+const STYLE = html.slice(html.indexOf('<style>'), html.indexOf('</style>'));
+const tokensOf = (selector) => {
+    const at = STYLE.indexOf(selector + ' {');
+    if (at === -1) return {};
+    const body = STYLE.slice(at, STYLE.indexOf('}', at));
+    return Object.fromEntries([...body.matchAll(/(--[\w-]+):\s*([^;]+);/g)].map((m) => [m[1], m[2].trim()]));
+};
+const rgbOf = (value, under) => {
+    const h = /^#([0-9a-f]{6})$/i.exec(value);
+    if (h) return [0, 2, 4].map((i) => parseInt(h[1].slice(i, i + 2), 16));
+    const m = /^rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)$/.exec(value);
+    return m && under ? under.map((u, i) => Math.floor(m[i + 1] * m[4] + u * (1 - m[4]))) : null;
+};
+const luminance = (rgb) => rgb.map((c) => (c /= 255) <= 0.04045 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4)
+    .reduce((sum, c, i) => sum + c * [0.2126, 0.7152, 0.0722][i], 0);
+const contrast = (x, y) => {
+    const [hi, lo] = [luminance(x), luminance(y)].sort((p, q) => q - p);
+    return (hi + 0.05) / (lo + 0.05);
+};
+for (const theme of csh.THEMES) {
+    const t = { ...tokensOf(':root'), ...tokensOf(`html[data-theme="${theme}"]`) };
+    const bg = rgbOf(t['--bg']);
+    const ratios = ['--fg', '--fg-dim', '--fg-hi'].map((k) => {
+        const fg = bg && rgbOf(t[k], bg);
+        return [k, fg ? contrast(fg, bg) : NaN];
+    });
+    test(`${theme}: ` + ratios.map(([k, r]) => `${k.slice(2)} ${r.toFixed(2)}`).join(', ') + ' — each ≥ 4.5:1', () => {
+        for (const [k, r] of ratios) ok(r >= 4.5, `${k} = ${t[k]} on ${t['--bg']} is ${r.toFixed(2)}:1`);
+    });
+}
+
 /* ---------- whole-file invariants: the soul of the project ------------------ */
 console.log('\ninvariants  (regression tests for the soul of the project)');
 test('zero external scripts — the whole point', () =>

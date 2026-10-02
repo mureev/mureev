@@ -79,10 +79,11 @@ npm test                           # unit (headless core, zero-dep runner) + e2e
 
 The unit suite slices the engine's pure core out of `index.html` by its
 `@core` markers and runs it with no DOM at all; the e2e suite boots the real
-page in Chromium and types at it like a visitor would — including a mobile
-viewport and a JavaScript-disabled pass. CI runs both on every push, plus a
-smoke test of the built image — built from owner-only (0600) files, so the
-Dockerfile's permission fix has to keep earning its place.
+page in Chromium and types at it like a visitor would — including
+keyboard-only use, what a screen reader is told, a mobile viewport and a
+JavaScript-disabled pass. CI runs both on every push, plus a smoke test of
+the built image — built from owner-only (0600) files, so the Dockerfile's
+permission fix has to keep earning its place.
 
 ### Map
 
