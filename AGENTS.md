@@ -11,8 +11,8 @@ purpose and every line in it was paid for.
 ## What this is
 
 A calling card. One page that boots into a terminal, plus error pages, served
-as static files by nginx in Docker. People who look
-Constantine up should find something current, credible, and built with care.
+as static files by nginx in Docker. People who look Constantine up should find
+something current, credible, and built with care.
 
 The terminal is the identity. In 2017 it was a quirky choice; now the engine
 itself is the point — hand-rolled, and View Source is part of the product.
@@ -51,9 +51,11 @@ build.
    purpose, so a change touches every copy: `LINKS`, `GREETING` and the
    command bodies in the core (incl. `neofetch`'s spec sheet), the `<head>`
    (title, description, OG, JSON-LD), the no-JS `#fallback`, `llms.txt`,
-   and the card in `assets/og.png` (regenerate with `tools/make_og.py`).
-   A unit test holds the contact links in `LINKS`, `#fallback` and
-   `llms.txt` to each other.
+   the card in `assets/og.png` (regenerate with `tools/make_og.py`), and the
+   profile intro at the top of `README.md` — it is the owner's GitHub
+   profile. Unit tests hold the contact links in `LINKS`, `#fallback` and
+   `llms.txt` to each other, and the README intro to whatever the greeting
+   links to.
 7. **Everything user-visible gets a test.** Core change → unit test. Behavior
    change → e2e test. A change with no test is half a change.
 
@@ -127,7 +129,8 @@ milestone:
 
 - imperative subject, ≤ 72 characters; the body says what changed and why,
   grouped by area, and accounts for every file in the diff;
-- a `Co-Authored-By:` trailer names the agent;
+- a `Co-Authored-By:` trailer names the agent, and it is the only trailer —
+  no session links: they point at private sessions, dead for everyone else;
 - nothing rides along — no drive-by fixes, no WIP.
 
 Never push, tag, amend or rewrite history. Publishing is the owner's move.

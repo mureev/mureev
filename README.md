@@ -1,6 +1,6 @@
 ### Hey, I'm Constantine.
 
-A human being 😉 leading software development teams at ACI Worldwide.
+A human being 😉 leading engineering teams at Renmoney.
 
 I believe in good people, curiosity & hard work.
 

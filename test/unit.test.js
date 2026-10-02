@@ -257,6 +257,13 @@ test('contact facts agree: LINKS = no-JS fallback = llms.txt', () => {
         ok(llms.includes(csh.LINKS[k].replace(/^mailto:/, '')), k + ' missing from llms.txt');
     }
 });
+test('the GitHub profile intro (top of README.md) names what the greeting links to', () => {
+    const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
+    const intro = readme.slice(0, readme.indexOf('\n---'));
+    const linked = csh.GREETING.flat().filter((p) => p && p.a).map((p) => p.t);
+    ok(linked.length > 0, 'the greeting links nothing — give this test a new anchor');
+    for (const name of linked) ok(intro.includes(name), name + ' missing from the README profile intro');
+});
 test('the dead analytics snippet stays dead', () =>
     ok(!html.includes('UA-111817231')));
 test(`size budget: raw ≤ 48 KB (now ${(BYTES / 1024).toFixed(1)} KB)`, () =>

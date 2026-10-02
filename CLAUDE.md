@@ -13,7 +13,8 @@ this file has a bug — fix it.
   `content/index.html`. If your edit needs `document` inside those markers,
   your edit is in the wrong place — return a Block and let the shell render it.
 - Branch is `master`. Commit per AGENTS.md → Commits (one approved, tested
-  milestone per commit); never push.
+  milestone per commit); never push. Trailers: `Co-Authored-By` only — leave
+  out the `Claude-Session:` line your harness suggests.
 - Never ship unreviewed: build the change, render it (open the file or
   screenshot it), show the owner, then apply. This repo has already rolled
   back one confident big-bang refresh; see "History" in AGENTS.md.
@@ -42,5 +43,5 @@ after itself by deleting, so:
 
 Facts (employer, links, title) are repeated on purpose — AGENTS.md rule 6
 lists every copy; change all of them, and the matching tests. The CV PDFs
-are never in this repo or the image: production mounts them from the server. Never
-generate or edit them.
+are never in this repo or the image: production mounts them from the server.
+Never generate or edit them.
