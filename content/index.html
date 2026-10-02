@@ -23,7 +23,7 @@
     <!-- Only this file's own code runs here: each inline <script> and <style>
          is allowed by its sha256, and no string becomes markup (Trusted Types).
          Edit one, and the unit suite prints this tag's new policy. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-1B3qiHf+FvcKWiJEJ2vOWg+EiK7tQlOTOeGF/2Aq1kI='; style-src 'sha256-mB4rKwSWKDYZclIoFtJ2SXvtMBA43ODEBTch/7GBtck='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-l55IYmFnhKIP8ZE54fgSqZb4Grdl+irV5CqiGRxN6KY='; style-src 'sha256-ceoIwWvacM5dW0CoGTPnRLyiSKOyP+tHrHfZitQEuaQ='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -165,9 +165,11 @@
         .neo pre { line-height: 1.35; }
         .sw { display: inline-block; width: 2.2ch; height: 1em; vertical-align: text-bottom; }
 
-        /* the hidden keyboard sink — see THE ONE CLEVER TRICK in the script */
+        /* the hidden keyboard sink — see THE ONE CLEVER TRICK in the script.
+           Absolute, no offsets: it stays where the flow puts it, under the
+           prompt, without taking up room there. */
         #kbd {
-            position: fixed; left: 0; bottom: 0;
+            position: absolute;
             width: 2px; height: 2px;
             font-size: 16px;                   /* stops iOS zoom-on-focus */
             opacity: 0; border: 0; padding: 0; margin: 0;
@@ -570,7 +572,7 @@
        ===================================================================== */
 
     const $id  = (i) => document.getElementById(i);
-    const out  = $id('out'), kbd = $id('kbd');
+    const term = $id('term'), out = $id('out'), row = $id('row'), kbd = $id('kbd');
     const bufA = $id('pre'), bufB = $id('post'), cur = $id('cursor');
     $id('ps1').textContent = PS1;
 
@@ -684,7 +686,19 @@
         }
     }
 
-    const scroll = () => window.scrollTo({ top: document.documentElement.scrollHeight });
+    /** Scroll the prompt to the bottom of what can be seen: above the
+        keyboard when one is up, since a phone's keyboard shrinks the visual
+        viewport and (on iOS) not the page. A screen with less to show than
+        that simply stops at its top, which is where a cleared one belongs. */
+    function scroll() {
+        const vv = window.visualViewport, gap = parseFloat(getComputedStyle(term).paddingBottom);
+        window.scrollBy(0, row.getBoundingClientRect().bottom + gap - (vv ? vv.offsetTop + vv.height : innerHeight));
+    }
+    /* The keyboard came or went, or the phone turned: keep the prompt in
+       view while it's in use — but leave a pinch-zoomed view alone. */
+    window.visualViewport?.addEventListener('resize', () => {
+        if (document.activeElement === kbd && visualViewport.scale < 1.01) scroll();
+    });
 
     /* --------------------------------------------------------------------
        THE ONE CLEVER TRICK — read this before "simplifying" it.
@@ -701,6 +715,8 @@
        semantics for free — we merely *mirror* its value and caret into
        the styled prompt row on every change. ~40 lines instead of a
        2,000-line keyboard layer. That's the trade, and it's a good one.
+       It sits right under the prompt, too: a phone that scrolls its
+       focused field above the keyboard brings the prompt along.
        -------------------------------------------------------------------- */
 
     function render() {
@@ -772,7 +788,7 @@
             line([{ t: PS1, c: 'ps1' }, kbd.value + '^C']);
             hist.reset(); setLine(''); scroll();
         }
-        else if (k === 'l' && e.ctrlKey) { e.preventDefault(); out.replaceChildren(); }
+        else if (k === 'l' && e.ctrlKey) { e.preventDefault(); out.replaceChildren(); scroll(); }
         else if (k === 'u' && e.ctrlKey) { e.preventDefault(); setLine(''); }
     });
 

@@ -445,6 +445,11 @@ const watch = (p) => {
     await mob.waitForTimeout(100);
     check('a tap anywhere else focuses the prompt, and it stays focused',
         (await mob.evaluate(() => document.activeElement.id)) === 'kbd');
+    const under = await mob.evaluate(() => {
+        const r = document.getElementById('row').getBoundingClientRect(), k = document.getElementById('kbd').getBoundingClientRect();
+        return Math.abs(k.top - r.bottom) <= 2 && Math.abs(k.left - r.left) <= 2;
+    });
+    check('the hidden input sits under the prompt, so a phone revealing it reveals the prompt', under);
     const swipe = await mob.context().newCDPSession(mob);
     await mob.evaluate(() => document.activeElement.blur());
     const focusedSoFar = await mob.evaluate(() => window.__focus);
@@ -460,6 +465,48 @@ const watch = (p) => {
        Chromium can't show that, so hold the cause instead. */
     check('no mouse listeners anywhere — on iOS one would make every tap take the keyboard away',
         mice.length === 0, mice.join(', '));
+
+    /* ---------- the keyboard's share of the screen ---------- */
+    /* A phone keyboard shrinks the visual viewport; on iOS the page keeps its
+       size and the scroll range grows by the keyboard's height (WebKit:
+       adjustedContentInset). Chromium has no such keyboard, so this one is
+       drawn by hand: a visualViewport that shrinks, and the extra range. */
+    console.log('\nthe keyboard (simulated)');
+    const kb = watch(await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true }));
+    await kb.addInitScript(() => {
+        let keys = 0, pan = 0;                              // keyboard height; iOS's offset of what's seen
+        const vv = Object.defineProperties(new EventTarget(), {
+            offsetLeft: { get: () => 0 }, offsetTop: { get: () => pan }, scale: { get: () => 1 },
+            width: { get: () => innerWidth }, height: { get: () => innerHeight - keys }
+        });
+        Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
+        window.__keyboard = (h, panned = 0) => {
+            keys = h; pan = panned;
+            document.body.style.paddingBottom = h + 'px';   // the extra scroll range iOS adds
+            vv.dispatchEvent(new Event('resize'));
+        };
+    });
+    await kb.goto(URL);
+    await kb.waitForFunction(() => document.querySelector('#out').innerText.includes('motd'), null, { timeout: 15000 });
+    await kb.locator('#out pre.logo').first().tap();
+    for (let i = 0; i < 4; i++) { await kb.keyboard.type('help'); await kb.keyboard.press('Enter'); }
+    const where = () => kb.evaluate(() => {
+        const vv = window.visualViewport, r = document.getElementById('row').getBoundingClientRect();
+        return { top: Math.round(r.top), bottom: Math.round(r.bottom), seen: vv.offsetTop + vv.height, y: scrollY };
+    });
+    const sitsAbove = (p) => p.bottom <= p.seen && p.bottom >= p.seen - 60;
+    await kb.evaluate(() => __keyboard(320));
+    const up = await where();
+    check('the keyboard comes up: the prompt sits right above it', sitsAbove(up), JSON.stringify(up));
+    await kb.evaluate(() => __keyboard(320, 140));
+    const panned = await where();
+    check('…and stays there when iOS pans the visible part of the page', sitsAbove(panned), JSON.stringify(panned));
+    await kb.evaluate(() => __keyboard(320));
+    await kb.keyboard.type('clear'); await kb.keyboard.press('Enter');
+    const cleared = await where();
+    check('clear after a long session: back to the top, the prompt in view', cleared.y === 0 && cleared.top >= 0 && cleared.bottom <= cleared.seen,
+        JSON.stringify(cleared));
+    await kb.close();
 
     /* ---------- no JavaScript ---------- */
     console.log('\nno-JS fallback');
