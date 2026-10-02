@@ -203,6 +203,21 @@ const watch = (p) => {
     check('…and so does typing with nothing focused', (await prompt()) === 'aboutxy');
     await press('Control+u');
 
+    await kp.keyboard.type('whoami'); await press('Enter');
+    const popup2 = kp.waitForEvent('popup', { timeout: 5000 }).catch(() => null);
+    await kp.locator('#out a', { hasText: 'Renmoney' }).first().click();
+    const opened2 = await popup2;
+    if (opened2) await opened2.close();
+    await press('ArrowUp');
+    check('after a mouse click on a link, the prompt has the keys again (↑ recalls history)',
+        opened2 && (await focused()) === 'kbd' && (await prompt()) === 'whoami', JSON.stringify({ focus: await focused(), prompt: await prompt() }));
+    await press('Control+u');
+    const helps = await tally('this list');
+    await kp.locator('#out .cmd', { hasText: 'help' }).first().click({ button: 'right' });
+    await kp.waitForTimeout(100);
+    check('a right-click on a command runs nothing: the context menu is the browser\'s', (await tally('this list')) === helps);
+    await kp.locator('#kbd').focus();
+
     await kp.evaluate(() => {
         document.activeElement.blur();
         getSelection().selectAllChildren([...document.querySelectorAll('#out .ln')].find((l) => l.textContent === 'Ready to chat?'));
@@ -244,8 +259,18 @@ const watch = (p) => {
     await kp.keyboard.type('theme green'); await press('Enter');
 
     await kp.emulateMedia({ forcedColors: 'active' });
-    check('forced colors: the cursor cell is outlined, not painted away',
-        (await kp.evaluate(() => getComputedStyle(document.getElementById('cursor')).outlineStyle)) === 'solid');
+    const cell = () => kp.evaluate(() => {
+        const s = getComputedStyle(document.getElementById('cursor'));
+        return s.backgroundColor + ' / ' + s.outlineStyle;
+    });
+    await kp.locator('#kbd').focus();
+    const focusedCell = await cell();
+    await press('Shift+Tab');
+    const blurredCell = await cell();
+    check('forced colors: the cursor still tells focus apart — a solid block, then an outline',
+        focusedCell !== blurredCell && !focusedCell.endsWith('solid') && blurredCell.endsWith('solid'),
+        focusedCell + ' → ' + blurredCell);
+    await kp.locator('#kbd').focus();
     await kp.emulateMedia({ forcedColors: 'none', contrast: 'more' });
     check('prefers-contrast: more drops the glow and the glass', await kp.evaluate(() =>
         getComputedStyle(document.body).textShadow === 'none' && getComputedStyle(document.getElementById('fx')).display === 'none'));
@@ -300,6 +325,14 @@ const watch = (p) => {
     });
     check('a newline typed mid-line (a mobile "go" key) runs the whole line',
         (await typed()).at(-1) === 'whoami' && (await promptNow()) === '', JSON.stringify((await typed()).slice(-2)));
+    const ranBefore = (await typed()).length;
+    await ip.evaluate(() => navigator.clipboard.writeText('whoami\n'.repeat(150)));
+    await ip.keyboard.press('ControlOrMeta+v');
+    await ip.waitForTimeout(300);
+    const ranNow = (await typed()).length - ranBefore;
+    check('a huge paste runs its first 100 lines and says so, rather than freeze the tab',
+        ranNow === 100 && (await ip.locator('#out').innerText()).includes('csh: paste: ran 100 of 150 lines') &&
+        (await promptNow()) === '', ranNow + ' lines ran');
     await ip.keyboard.type('hi \u{1F44B}\u{1F3FD} there');
     for (let i = 0; i < 7; i++) await ip.keyboard.press('ArrowLeft');
     await ip.waitForTimeout(100);                       // the mirror follows on selectionchange
@@ -309,6 +342,15 @@ const watch = (p) => {
     check('mobile keyboards are asked to leave commands alone: no autocorrect, capitals or spellcheck',
         await ip.locator('#kbd').evaluate((k) =>
             k.getAttribute('autocorrect') === 'off' && k.getAttribute('autocapitalize') === 'off' && !k.spellcheck));
+    await ip.keyboard.press('Control+u');
+    await ip.keyboard.type('hello');
+    const ends = [];
+    for (const key of ['Home', 'End']) {
+        await ip.keyboard.press(key);
+        await ip.waitForTimeout(100);
+        ends.push(await ip.evaluate(() => document.getElementById('pre').textContent));
+    }
+    check('Home and End go to the ends of the line, not one character', JSON.stringify(ends) === '["","hello"]', JSON.stringify(ends));
     await ic.close();
 
     /* ---------- mobile ---------- */

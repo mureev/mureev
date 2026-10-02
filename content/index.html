@@ -24,7 +24,7 @@
          for byte: each inline <script> and <style> below is allowed by its
          sha256, and no string may become markup (Trusted Types). Edit one
          and the unit suite prints the new line for this tag. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-Gc34YMbVmi7KJ0ceREIR7gFzkMrNecIBw59tudGHJo8='; style-src 'sha256-3v1bAf1qHrakAW97alV77B9BSZVAU0IHCQi6s2zQsyc='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-qYlEdL/20gu99y3QfY/oohhGyH8YKBmedceOv8/EKoE='; style-src 'sha256-7xLuV8OoCP9VPn8UTPlaNokcO6LHV7nx/uKsPS66kAU='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -210,13 +210,22 @@
         }
         /* Asked for more contrast? No glow, no glass. Forced colors (Windows
            High Contrast): the OS owns the palette and drops the glass itself,
-           but it paints the block cursor away — so outline the cell instead. */
+           but it would repaint the cursor into its surroundings — so the
+           cursor paints itself in system colours: a solid block while the
+           prompt has focus, an outline while it doesn't. */
         @media (prefers-contrast: more) {
             body { text-shadow: none; }
             #fx { display: none; }
         }
         @media (forced-colors: active) {
-            #cursor { outline: 2px solid; outline-offset: -2px; }
+            #cursor {
+                forced-color-adjust: none; animation: none;
+                background: CanvasText; color: Canvas; box-shadow: none;
+            }
+            #term:not(:has(#kbd:focus)) #cursor {
+                background: Canvas; color: CanvasText; box-shadow: none;
+                outline: 1px solid CanvasText; outline-offset: -1px;
+            }
         }
 
         /* ---- no-JS fallback: the terminal, pre-recorded ---- */
@@ -273,7 +282,7 @@
         <div id="out" role="log" aria-live="polite"></div>
         <div id="row" aria-hidden="true"><span class="ps1" id="ps1"></span><span id="pre"></span><span id="cursor">&nbsp;</span><span id="post"></span></div>
         <textarea id="kbd" autocapitalize="off" autocomplete="off" autocorrect="off"
-                  spellcheck="false" enterkeyhint="go" aria-label="Terminal input"></textarea>
+                  spellcheck="false" enterkeyhint="go" wrap="off" aria-label="Terminal input"></textarea>
     </div>
 
     <script>
@@ -720,6 +729,7 @@
 
     /* ---------- keyboard wiring ----------------------------------------- */
     let booting = true, skipBoot = false;
+    const PASTE_MAX = 100;
 
     kbd.addEventListener('input', (e) => {
         if (/[\r\n]/.test(kbd.value)) {
@@ -727,8 +737,12 @@
             kbd.value = '';
             if (/^insertFrom/.test(e.inputType)) {  // a paste runs line by line, like a terminal;
                 const rest = lines.pop();            // what follows the last newline waits at the prompt
-                for (const l of lines) exec(l);
-                setLine(rest);
+                for (const l of lines.slice(0, PASTE_MAX)) exec(l);
+                if (lines.length <= PASTE_MAX) setLine(rest);
+                else {                               // …up to a point: thousands would freeze the tab
+                    line([{ t: `csh: paste: ran ${PASTE_MAX} of ${lines.length} lines`, c: 'err' }]);
+                    scroll();
+                }
             } else {
                 exec(lines.join(''));                // a mobile "go" key, wherever the caret was
             }
@@ -787,7 +801,11 @@
     });
     document.addEventListener('pointerup', (e) => {
         if (booting) { skipBoot = true; return; }
-        if (e.target.closest('a')) return;
+        if (e.button > 0) return;                     // other buttons: the browser's (a context menu, say)
+        if (e.target.closest('a')) {                  // the link opens; the prompt gets the keys back
+            if (e.pointerType === 'mouse') setTimeout(focus);
+            return;
+        }
         const c = e.target.closest('.cmd');
         if (c) {                                      // a finger gets the output, not a keyboard over it
             exec(c.dataset.cmd);
