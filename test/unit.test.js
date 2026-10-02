@@ -225,6 +225,119 @@ test('dispatch is case-insensitive', () => {
     ok(allText(csh.dispatch('HELP', CTX())).includes('thisistheway'));
 });
 
+/* ---------- the output vocabulary, checked ----------------------------------- */
+/* The core documents the only shapes a command may produce ("Output
+   vocabulary" in index.html) and the renderer trusts that list blindly.
+   Here the list stops being a comment and becomes a contract.             */
+console.log('\nvocabulary  (every Block is one the renderer knows)');
+const PART_KEYS = ['c', 'a', 'cmd'];
+const isPart = (p) => typeof p === 'string'
+    || (p !== null && typeof p === 'object' && typeof p.t === 'string'
+        && Object.keys(p).every((k) => k === 't' || PART_KEYS.includes(k))
+        && PART_KEYS.filter((k) => k in p).length <= 1);
+function vocabularyError(b) {
+    if (b === null || typeof b !== 'object') return 'not an object';
+    const keys = Object.keys(b);
+    const only = (...allowed) => keys.every((k) => allowed.includes(k));
+    if ('ln' in b)    return only('ln') && Array.isArray(b.ln) && b.ln.every(isPart) ? null : 'malformed ln';
+    if ('pre' in b)   return only('pre', 'cls') && typeof b.pre === 'string' ? null : 'malformed pre';
+    if ('neo' in b)   return only('neo') && Array.isArray(b.neo?.fields) ? null : 'malformed neo';
+    if ('gif' in b)   return only('gif') && typeof b.gif?.src === 'string' && typeof b.gif?.alt === 'string' ? null : 'malformed gif';
+    if ('clear' in b) return only('clear') && b.clear === true ? null : 'malformed clear';
+    if ('theme' in b) return only('theme') && csh.THEMES.includes(b.theme) ? null : 'malformed theme';
+    return 'unknown Block shape {' + keys.join(', ') + '}';
+}
+test('every command, with or without an argument, speaks only the vocabulary', () => {
+    for (const name of NAMES) {
+        for (const arg of ['', ' amber', ' nope', ' constructor']) {
+            for (const blk of csh.dispatch(name + arg, CTX())) {
+                const err = vocabularyError(blk);
+                ok(!err, `${name}${arg}: ${err}`);
+            }
+        }
+    }
+});
+
+/* ---------- hostile input: the core never throws ------------------------------ */
+/* What a visitor types is input from strangers. Every hostile atom is tried
+   against every command name, in both orders, in both cases — a fixed table,
+   so a red build names its input. Then a seeded generator (same lines every
+   run) strings atoms together, because bugs like company. The 2026
+   'constructor' crash — a prototype name typed into a terminal — is why
+   this section exists. Invisible characters are written as escapes on
+   purpose: this file must stay readable, and free of bidi surprises.       */
+console.log('\nhostile input  (a fixed table, then seeded combinations)');
+const ATOMS = [
+    'constructor', '__proto__', 'prototype', 'toString', 'hasOwnProperty', 'valueOf',
+    '__defineGetter__', 'isPrototypeOf', 'Object', 'null', 'undefined', 'NaN', '-1', '1e309',
+    '', ' ', '\t', '\n', '\r\n', '\u00a0', '\u2028', '\u3000', '\u0000', '\u202e', '\ufeff', '\u200d',
+    '\ud83d\ude80', '\ud83d\udc69\u200d\ud83d\udcbb', '\u00e9', '\u0130', '\u00df', '\ufb03',
+    '\u041a\u043e\u043d\u0441\u0442\u0430\u043d\u0442\u0438\u043d', '"', "'", '\\', '`', '$(rm -rf /)',
+    '<script>alert(1)</script>', '&amp;', '%00', '../..', 'javascript:', 'x'.repeat(4096)
+];
+const WORDS = [...NAMES, ...csh.THEMES];
+const show = (s) => JSON.stringify(s).slice(0, 80);
+function survives(raw) {
+    let blocks;
+    try { blocks = csh.dispatch(raw, CTX()); }
+    catch (e) { throw new Error(`dispatch threw on ${show(raw)}: ${e.message}`); }
+    ok(Array.isArray(blocks), 'not a Block[] for ' + show(raw));
+    for (const blk of blocks) { const err = vocabularyError(blk); ok(!err, `${err} for ${show(raw)}`); }
+    ok(csh.parse(raw).every((w) => w && !/\s/.test(w)), 'parse leaked whitespace for ' + show(raw));
+    const fx = blocks.filter((blk) => blk.theme);
+    if (fx.length) {
+        const argv = csh.parse(raw);
+        ok(argv[0].toLowerCase() === 'theme' && csh.THEMES.includes(argv[1].toLowerCase()),
+            'a theme switch from ' + show(raw));
+    }
+    let r;
+    try { r = csh.complete(raw, NAMES); }
+    catch (e) { throw new Error(`complete threw on ${show(raw)}: ${e.message}`); }
+    ok(r === null || (typeof r.set === 'string' ? r.set.endsWith(' ') && !('list' in r)
+        : Array.isArray(r.list) && r.list.length > 1), 'malformed completion for ' + show(raw));
+}
+const TABLE = [];
+for (const atom of ATOMS) {
+    TABLE.push(atom);
+    for (const w of [...WORDS, 'theme']) {
+        TABLE.push(w + ' ' + atom, atom + ' ' + w, w.toUpperCase() + '\t' + atom, ' ' + w + atom + ' ');
+    }
+}
+test(`the table: ${TABLE.length} lines — every hostile atom against every command and theme`, () =>
+    TABLE.forEach(survives));
+
+function mulberry32(seed) {   // tiny, deterministic, good enough for this job
+    return () => {
+        seed = (seed + 0x6D2B79F5) | 0;
+        let t = Math.imul(seed ^ (seed >>> 15), 1 | seed);
+        t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t;
+        return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+    };
+}
+const rand = mulberry32(20090901);            // the career's first day, as a seed
+const pick = (xs) => xs[Math.floor(rand() * xs.length)];
+const SEPS = [' ', '  ', '\t', '', '\u3000'];
+const fuzzLine = () => Array.from({ length: 1 + Math.floor(rand() * 4) },
+    () => pick(rand() < 0.5 ? ATOMS : WORDS)).join(pick(SEPS));
+const N = 5000;
+test(`seeded combinations: ${N} lines of up to four atoms`, () => {
+    for (let i = 0; i < N; i++) survives(fuzzLine());
+});
+test('history: 10,000 seeded operations on a 5-slot history, invariants after each', () => {
+    const h = new csh.Hist(5);                // small, so the walk keeps hitting both ends
+    for (let i = 0; i < 10000; i++) {
+        const op = rand();
+        if (op < 0.35) h.push(fuzzLine());
+        else if (op < 0.7) h.prev(fuzzLine());
+        else if (op < 0.95) h.next();
+        else h.reset();
+        ok(h.items.length <= 5, 'over capacity');
+        ok(h.idx >= 0 && h.idx <= h.items.length, 'walk out of bounds: ' + h.idx);
+        ok(h.items.every((v, j) => v && v === v.trim() && v !== h.items[j - 1]),
+            'stored an empty, untrimmed or repeated entry');
+    }
+});
+
 /* ---------- content guards -------------------------------------------------- */
 console.log('\ncontent guards');
 test('the greeting typo stays fixed ("hard work." — no stray ?)', () => {
@@ -234,6 +347,23 @@ test('the greeting typo stays fixed ("hard work." — no stray ?)', () => {
 });
 test('the greeting links Renmoney', () => {
     ok(csh.GREETING.some((l) => l.some?.((p) => p.a === csh.LINKS.renmoney)));
+});
+test('the command set is the approved eleven (AGENTS.md rule 5 — change only with sign-off)', () =>
+    eq(NAMES, ['help', 'about', 'contacts', 'cv', 'social', 'whoami', 'uptime',
+        'neofetch', 'theme', 'clear', 'thisistheway']));
+test('the themes are the approved five', () =>
+    eq(csh.THEMES, ['green', 'amber', 'mono', 'crt', 'flat']));
+test('JSON-LD parses and says what the terminal says', () => {
+    const m = html.match(/<script type="application\/ld\+json">([\s\S]*?)<\/script>/);
+    ok(m, 'no JSON-LD block');
+    const ld = JSON.parse(m[1]);
+    const role = csh.specsheet(CTX()).fields.find(([k]) => k === 'Role')[1];
+    eq(ld.name, 'Constantine Mureev');
+    eq(ld.email, csh.LINKS.email);
+    eq(ld.jobTitle, role, 'jobTitle ≠ the spec sheet Role');
+    eq(ld.worksFor.url, csh.LINKS.renmoney);
+    for (const k of ['linkedin', 'telegram', 'messenger'])
+        ok(ld.sameAs.includes(csh.LINKS[k]), k + ' missing from sameAs');
 });
 
 /* ---------- whole-file invariants: the soul of the project ------------------ */
@@ -263,6 +393,19 @@ test('the GitHub profile intro (top of README.md) names what the greeting links 
     const linked = csh.GREETING.flat().filter((p) => p && p.a).map((p) => p.t);
     ok(linked.length > 0, 'the greeting links nothing — give this test a new anchor');
     for (const name of linked) ok(intro.includes(name), name + ' missing from the README profile intro');
+});
+test('no Trojan Source: no bidi controls or invisible characters in any text file', () => {
+    const ROOT = path.join(__dirname, '..'), hidden = /[\u202A-\u202E\u2066-\u2069\u200B\u200C\u200E\u200F\uFEFF]/;
+    const TEXT = /\.(html|txt|md|js|py|ya?ml|conf|inc|json)$|^(Dockerfile|LICENSE|\.[a-z]+ignore)$/;
+    const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
+        e.name === '.git' || e.name === 'node_modules' ? []
+            : e.isDirectory() ? walk(path.join(dir, e.name))
+            : TEXT.test(e.name) ? [path.join(dir, e.name)] : []);
+    for (const f of walk(ROOT)) {
+        const lines = fs.readFileSync(f, 'utf8').split('\n');
+        const i = lines.findIndex((l) => hidden.test(l));
+        ok(i === -1, path.relative(ROOT, f) + ':' + (i + 1) + ' hides a character (write it as an escape)');
+    }
 });
 test('the dead analytics snippet stays dead', () =>
     ok(!html.includes('UA-111817231')));
