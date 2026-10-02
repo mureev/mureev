@@ -15,8 +15,8 @@ permissions:
 jobs:
   live:
     name: mureev.com, live
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04   # pinned, like ci.yml
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -26,7 +26,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - uses: ./.github/actions/chromium
       - name: e2e against the live site
         run: npm run test:e2e
         env:

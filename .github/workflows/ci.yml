@@ -15,12 +15,14 @@ concurrency:
   cancel-in-progress: false
 
 # Every action is pinned to a full commit SHA (its release tag in the comment), so a
-# moved tag can't change what runs here; Dependabot proposes the updates weekly.
+# moved tag can't change what runs here; Dependabot proposes the updates weekly. The
+# runners are pinned too: ubuntu-latest turns into Ubuntu 26.04 from 2026-10-19, and
+# that move should be a commit, not a surprise.
 jobs:
   suite:
     name: unit + e2e
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
         with:
@@ -30,7 +32,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - uses: ./.github/actions/chromium
       - run: npm test
 
   # Build once, test that image, ship that image: the build is set aside before any npm code runs,
@@ -38,8 +40,8 @@ jobs:
   image:
     name: image — build and test
     needs: suite
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
     outputs:
       sha256: ${{ steps.build.outputs.sha256 }}
     steps:
@@ -90,7 +92,7 @@ jobs:
           node-version: 24
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - uses: ./.github/actions/chromium
       - name: e2e against the container
         run: npm run test:e2e
         env:
@@ -107,7 +109,7 @@ jobs:
     name: publish to GHCR
     needs: image
     if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 10
     permissions:
       contents: read

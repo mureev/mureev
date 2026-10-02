@@ -1,0 +1,17 @@
+name: Chromium for the e2e suite
+description: >-
+  Playwright's headless Chromium and the system libraries it needs. apt mirrors
+  and the browser download stall now and then — once for ten minutes, until the
+  job's limit cancelled it — so each try gets three minutes, and there are three.
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        for try in 1 2 3; do
+          timeout 180 npx playwright install --with-deps --only-shell chromium && exit 0
+          echo "::warning::installing Chromium stalled or failed (try $try of 3)"
+          sudo dpkg --configure -a || true    # a killed apt can leave dpkg half-done
+          sleep 10
+        done
+        exit 1
