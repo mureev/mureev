@@ -19,9 +19,10 @@ const vm   = require('vm');
 const zlib = require('zlib');
 const { createHash } = require('crypto');
 
-const HTML_PATH = path.join(__dirname, '..', 'content', 'index.html');
-const html = fs.readFileSync(HTML_PATH, 'utf8');
-const BYTES = Buffer.byteLength(html);
+const ROOT    = path.join(__dirname, '..');
+const CONTENT = path.join(ROOT, 'content');
+const html    = fs.readFileSync(path.join(CONTENT, 'index.html'), 'utf8');
+const BYTES   = Buffer.byteLength(html), GZ = zlib.gzipSync(html).length;
 
 /* ---------- the runner (hand-rolled, on principle) ---------------------- */
 let passed = 0;
@@ -48,7 +49,7 @@ test('both @core markers present, in order, exactly once', () => {
 
 const core = html.slice(a + MARK_A.length, b);
 
-test('core is DOM-free (no document/window/localStorage/matchMedia)', () => {
+test('core is DOM-free (no document/window/navigator/localStorage/matchMedia)', () => {
     ok(!/\b(document|window|localStorage|matchMedia|navigator)\b/.test(core),
         'core references a browser global');
 });
@@ -381,7 +382,7 @@ test('the command set is the approved eleven (AGENTS.md rule 5 — change only w
 test('the themes are the approved five', () =>
     eq(csh.THEMES, ['green', 'amber', 'mono', 'crt', 'flat']));
 test('security.txt: the site\'s email, and an Expires date at most a year out (RFC 9116)', () => {
-    const txt = fs.readFileSync(path.join(__dirname, '..', 'content', '.well-known', 'security.txt'), 'utf8');
+    const txt = fs.readFileSync(path.join(CONTENT, '.well-known', 'security.txt'), 'utf8');
     const field = (name) => (new RegExp('^' + name + ': *(.+)$', 'm').exec(txt) || [])[1];
     eq(field('Contact'), csh.LINKS.email);
     /* Only an upper bound here: time can't break it, so it never blocks a
@@ -450,7 +451,6 @@ for (const theme of csh.THEMES) {
    second opinion: a stale hash there is a blocked script and a console
    error. A <script> typed as data (the JSON-LD) never runs, so needs none. */
 console.log('\nCSP  (each page\'s <meta> policy vs. its own inline blocks)');
-const CONTENT = path.join(__dirname, '..', 'content');
 const BLOCKS  = /<!--[\s\S]*?-->|<(script|style)\b([^>]*)>([\s\S]*?)<\/\1\s*>/gi;
 const JS_TYPE = /^(module|(text|application)\/(x-)?(java|ecma)script)$/i;
 const sha256  = (s) => `'sha256-${createHash('sha256').update(s.replace(/\r\n?/g, '\n')).digest('base64')}'`;
@@ -508,13 +508,13 @@ test('jQuery survives only in the eulogy (comments), never in code', () =>
     ok(!/jquery/i.test(html.replace(/<!--[\s\S]*?-->/g, '')),
         'jquery referenced outside an HTML comment'));
 test('no page loads anything from elsewhere (every content/*.html)', () => {
-    for (const f of fs.readdirSync(path.join(__dirname, '..', 'content')).filter((f) => f.endsWith('.html'))) {
-        const page = fs.readFileSync(path.join(__dirname, '..', 'content', f), 'utf8');
+    for (const f of fs.readdirSync(CONTENT).filter((f) => f.endsWith('.html'))) {
+        const page = fs.readFileSync(path.join(CONTENT, f), 'utf8');
         ok(!/<script[^>]*\ssrc=|<link[^>]*rel=["']?stylesheet/i.test(page), f + ' loads an external script or stylesheet');
     }
 });
 test('contact facts agree: LINKS = no-JS fallback = llms.txt', () => {
-    const llms = fs.readFileSync(path.join(__dirname, '..', 'content', 'llms.txt'), 'utf8');
+    const llms = fs.readFileSync(path.join(CONTENT, 'llms.txt'), 'utf8');
     const fallback = html.slice(html.indexOf('<main id="fallback">'), html.indexOf('</main>'));
     for (const k of ['email', 'linkedin', 'telegram', 'messenger', 'cvEn', 'cvRu']) {
         ok(fallback.includes(csh.LINKS[k]), k + ' missing from #fallback');
@@ -522,7 +522,7 @@ test('contact facts agree: LINKS = no-JS fallback = llms.txt', () => {
     }
 });
 test('the GitHub profile intro (top of README.md) names what the greeting links to', () => {
-    const readme = fs.readFileSync(path.join(__dirname, '..', 'README.md'), 'utf8');
+    const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');
     const intro = readme.slice(0, readme.indexOf('\n---'));
     const linked = csh.GREETING.flat().filter((p) => p && p.a).map((p) => p.t);
     ok(linked.length > 0, 'the greeting links nothing — give this test a new anchor');
@@ -531,7 +531,7 @@ test('the GitHub profile intro (top of README.md) names what the greeting links 
 test('no Trojan Source: no bidi controls or invisible characters in any text file', () => {
     // every format character (bidi controls, zero-widths, the BOM, soft hyphens…) and everything
     // Unicode says renders as nothing (variation selectors, Hangul fillers, the grapheme joiner…)
-    const ROOT = path.join(__dirname, '..'), hidden = /[\p{Cf}\p{Default_Ignorable_Code_Point}]/u;
+    const hidden = /[\p{Cf}\p{Default_Ignorable_Code_Point}]/u;
     const TEXT = /\.(html|txt|md|js|py|ya?ml|conf|inc|json|svg)$|^(Dockerfile|LICENSE|\.[a-z]+ignore)$/;
     const walk = (dir) => fs.readdirSync(dir, { withFileTypes: true }).flatMap((e) =>
         e.name === '.git' || e.name === 'node_modules' ? []
@@ -547,10 +547,8 @@ test('the dead analytics snippet stays dead', () =>
     ok(!html.includes('UA-111817231')));
 test(`size budget: raw ≤ 48 KB (now ${(BYTES / 1024).toFixed(1)} KB)`, () =>
     ok(BYTES <= 48 * 1024, 'index.html got fat — features pay rent in bytes'));
-test((() => {
-    const gz = zlib.gzipSync(html).length;
-    return `size budget: gzipped ≤ 14 KB (now ${(gz / 1024).toFixed(1)} KB)`;
-})(), () => ok(zlib.gzipSync(html).length <= 14 * 1024, 'gzipped budget blown'));
+test(`size budget: gzipped ≤ 14 KB (now ${(GZ / 1024).toFixed(1)} KB, ${14 * 1024 - GZ} bytes to spare)`, () =>
+    ok(GZ <= 14 * 1024, 'gzipped budget blown'));
 
 /* ---------- summary ---------------------------------------------------------- */
 console.log('\n' + passed + '/' + (passed + failures.length) + ' unit tests passed'
