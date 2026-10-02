@@ -416,7 +416,17 @@ const watch = (p) => {
         isMobile: true, hasTouch: true,
         userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
     }));
+    await mob.addInitScript(() => {                   // note every mouse listener the page adds
+        window.__mouse = [];
+        const add = EventTarget.prototype.addEventListener;
+        EventTarget.prototype.addEventListener = function (type, ...rest) {
+            if (/^(mouse(down|up|move|over|out)|click|auxclick|dblclick)$/.test(type))
+                window.__mouse.push(type + ' on ' + (this.id || this.nodeName || 'window'));
+            return add.call(this, type, ...rest);
+        };
+    });
     await mob.goto(URL);
+    const mice = await mob.evaluate(() => window.__mouse);  // the page's own: Playwright adds its listeners later
     await mob.waitForFunction(() =>                  // let the boot type itself out
         document.querySelector('#term').innerText.includes('Type help for commands.'),
         null, { timeout: 15000 }).catch(() => {});   // on timeout the check below reports it
@@ -435,6 +445,21 @@ const watch = (p) => {
     await mob.waitForTimeout(100);
     check('a tap anywhere else focuses the prompt, and it stays focused',
         (await mob.evaluate(() => document.activeElement.id)) === 'kbd');
+    const swipe = await mob.context().newCDPSession(mob);
+    await mob.evaluate(() => document.activeElement.blur());
+    const focusedSoFar = await mob.evaluate(() => window.__focus);
+    await swipe.send('Input.dispatchTouchEvent', { type: 'touchStart', touchPoints: [{ x: 200, y: 400 }] });
+    for (const dy of [15, 45, 90]) await swipe.send('Input.dispatchTouchEvent', { type: 'touchMove', touchPoints: [{ x: 200, y: 400 - dy }] });
+    await swipe.send('Input.dispatchTouchEvent', { type: 'touchEnd', touchPoints: [] });
+    await mob.waitForTimeout(150);
+    check('a swipe is not a tap: no keyboard',
+        (await mob.evaluate(() => window.__focus)) === focusedSoFar && (await mob.evaluate(() => document.activeElement.id)) !== 'kbd');
+    /* WebKit treats a page with any mousedown/mouseup/click/mousemove
+       listener as clickable everywhere: every tap becomes a click, whose
+       mousedown blurs the prompt — on iPhones the keyboard rose and fell.
+       Chromium can't show that, so hold the cause instead. */
+    check('no mouse listeners anywhere — on iOS one would make every tap take the keyboard away',
+        mice.length === 0, mice.join(', '));
 
     /* ---------- no JavaScript ---------- */
     console.log('\nno-JS fallback');

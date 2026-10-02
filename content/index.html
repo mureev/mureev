@@ -24,7 +24,7 @@
          for byte: each inline <script> and <style> below is allowed by its
          sha256, and no string may become markup (Trusted Types). Edit one
          and the unit suite prints the new line for this tag. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-+tOBoZRINN9gpn6E2finpe4GJlm6PsuTzW64bPf1e+I='; style-src 'sha256-5J0TC0x2/2kqrsnnIADs8zlVd7WUBBJWOGVhl4HoUII='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-Hf+LFWKcuLuinqA0MTAp6ymN3gpUkSGYh3Rvmbv/BXo='; style-src 'sha256-5J0TC0x2/2kqrsnnIADs8zlVd7WUBBJWOGVhl4HoUII='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -814,15 +814,27 @@
             if (e.pointerType === 'mouse') focus();
             return;
         }
-        focus();
+        if (e.pointerType !== 'touch') focus();      // a finger's tap is touchend's: below
     });
-    /* After a tap, Chrome sends a compatibility mousedown whose default
-       action blurs the prompt the pointerup just focused — on Android the
-       keyboard came up and went straight back down. Keep the focus the tap
-       gave. (Only Chromium reports firesTouchEvents; elsewhere this is inert.) */
-    document.addEventListener('mousedown', (e) => {
-        if (e.sourceCapabilities?.firesTouchEvents && document.activeElement === kbd &&
-            !e.target.closest('a, .cmd')) e.preventDefault();
+    /* Tap to type. A phone raises its keyboard only for a focus made inside
+       a touch event, and the click a browser sends after a tap blurs it
+       again with its mousedown. So the tap is taken at touchend, and
+       cancelled: no click follows. And no mouse listeners on this page,
+       ever — on iOS one alone turns every tap into such a click (WebKit's
+       nodeRespondingToClickEvents), and the keyboard bounces. */
+    let tap = null;                                   // where a one-finger touch began, until it moves
+    document.addEventListener('touchstart', (e) => {
+        tap = e.touches.length === 1 ? [e.touches[0].clientX, e.touches[0].clientY] : null;
+    }, { passive: true });
+    document.addEventListener('touchmove', (e) => {
+        if (tap && Math.hypot(e.touches[0].clientX - tap[0], e.touches[0].clientY - tap[1]) > 10) tap = null;
+    }, { passive: true });
+    document.addEventListener('touchend', (e) => {
+        const tapped = tap && !e.touches.length;
+        tap = null;
+        if (booting || !tapped || e.target.closest('a, .cmd') || String(window.getSelection() || '')) return;
+        e.preventDefault();
+        focus();
     });
     out.addEventListener('keydown', (e) => {
         const c = e.target.closest?.('.cmd');
