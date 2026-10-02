@@ -21,7 +21,7 @@
     <!-- Only this file's own code runs here: each inline <script> and <style>
          is allowed by its sha256, and no string becomes markup (Trusted Types).
          Edit one, and the unit suite prints this tag's new policy. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-bvYVbZvPOc5pLcvzApxHreozMnYO0ySI8rBeBB4/Zls='; style-src 'sha256-eqPT3sKuMfHYOsHEZ3+5HGxV9HSdwindRpK+m5vOQLA='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-7AkX91tawrCIDGCDDB3caDxOi7HTP/EQICOwMYPPAWw='; style-src 'sha256-eqPT3sKuMfHYOsHEZ3+5HGxV9HSdwindRpK+m5vOQLA='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -341,7 +341,6 @@
              | { t, a }                     link         (a: href)
              | { t, cmd }                   clickable command
        Block = { ln: Part[] }               one output line
-             | { pre: string, cls? }        preformatted block
              | { neo: SpecSheet }           the neofetch card (data only)
              | { gif: {src, w, alt} }       an image
              | { clear: true }              wipe the scrollback
@@ -412,10 +411,10 @@
     /** Tab completion over command names — and over theme names when the
         line starts with `theme `. Pure: returns what *should* happen.
         @returns {{set: string} | {list: string[]} | null}                 */
-    function complete(value, names) {
+    function complete(value) {
         const words = value.split(/\s+/);
         let pool = null, prefix = '';
-        if (words.length === 1) { pool = names; prefix = words[0]; }
+        if (words.length === 1) { pool = Object.keys(COMMANDS); prefix = words[0]; }
         else if (words[0] === 'theme' && words.length === 2) { pool = THEMES; prefix = words[1]; }
         if (!pool) return null;
         const m = pool.filter((c) => c.startsWith(prefix.toLowerCase()));
@@ -424,11 +423,11 @@
         return null;
     }
 
+    const GRAPHEMES = typeof Intl === 'object' && Intl.Segmenter ? new Intl.Segmenter() : null;
     /** The character under the block cursor: one whole grapheme — an
         emoji, a flag, a letter with its accents — never half of one. A
         string index counts UTF-16 units; people count characters. Empty
         at the end of the line.                                           */
-    const GRAPHEMES = typeof Intl === 'object' && Intl.Segmenter ? new Intl.Segmenter() : null;
     function glyphAt(value, i) {
         if (i >= value.length) return '';
         if (!GRAPHEMES) return String.fromCodePoint(value.codePointAt(i));
@@ -438,7 +437,7 @@
 
     /** The neofetch card as data. The shell decides pixels; this decides
         facts. ctx carries the clock and current theme (injected — see
-        dispatch). @returns {{title, fields, palette}}                     */
+        dispatch). @returns {{title, fields}}                              */
     function specsheet(ctx) {
         const t = tenure(ctx.now());
         return {
@@ -453,8 +452,7 @@
                 ['Shell',    'csh — the Constantine shell'],
                 ['Langs',    'Russian (native) · English (bilingual)'],
                 ['Contact',  [{ t: 'constantine@mureev.com', a: LINKS.email }]]
-            ],
-            palette: ['#555', '#999', '#ddd', 'var(--fg-dim)', 'var(--fg)', 'var(--fg-hi)']
+            ]
         };
     }
 
@@ -514,11 +512,11 @@
             run: (arg, ctx) => [{ neo: specsheet(ctx) }]
         },
         theme: {
-            d: 'green · amber · mono · crt · flat',
+            d: THEMES.join(' · '),
             run: (arg, ctx) => {
                 if (!arg) return [
                     { ln: ['themes: ',
-                        ...THEMES.flatMap((t, i) => [{ t, cmd: 'theme ' + t }, i < THEMES.length - 1 ? ' · ' : '']),
+                        ...THEMES.flatMap((t, i) => [i ? ' · ' : '', { t, cmd: 'theme ' + t }]),
                         { t: `   (current: ${ctx.theme()})`, c: 'dim' }] },
                     { ln: [{ t: 'usage: theme <name>', c: 'dim' }] }
                 ];
@@ -547,12 +545,20 @@
     function dispatch(raw, ctx) {
         const argv = parse(raw);
         if (!argv.length) return [];
-        const name = argv[0].toLowerCase();       // own keys only — 'constructor' is not a command
+        const name = argv[0].toLowerCase();
+        // own keys only — 'constructor' is not a command
         const c = Object.prototype.hasOwnProperty.call(COMMANDS, name) ? COMMANDS[name] : null;
         if (!c) return [{ ln: [{ t: `csh: command not found: ${argv[0]}`, c: 'err' },
                                ' — try ', { t: 'help', cmd: 'help' }] }];
         return c.run(argv[1]?.toLowerCase(), ctx);
     }
+
+    /** All of the above that anyone else gets: the shell hands it to the
+        console, and the unit suite reads it back out of its node:vm. */
+    const csh = Object.freeze({
+        VERSION, PS1, THEMES, LOGO, LINKS, GREETING,
+        parse, tenure, clock, Hist, complete, glyphAt, specsheet, dispatch, COMMANDS
+    });
 
     /* @core-end */
     /* =====================================================================
@@ -561,7 +567,7 @@
 
     const $id  = (i) => document.getElementById(i);
     const term = $id('term'), out = $id('out'), row = $id('row'), kbd = $id('kbd');
-    const bufA = $id('pre'), bufB = $id('post'), cur = $id('cursor');
+    const pre  = $id('pre'), post = $id('post'), cursor = $id('cursor');
     $id('ps1').textContent = PS1;
 
     const ctx  = {
@@ -569,10 +575,6 @@
         theme: () => document.documentElement.getAttribute('data-theme') || 'green'
     };
     const hist = new Hist();
-    const store = {
-        get(k) { try { return localStorage.getItem(k); } catch (e) { return null; } },
-        set(k, v) { try { localStorage.setItem(k, v); } catch (e) { /* fine */ } }
-    };
 
     /* ---------- rendering: Parts and Blocks → DOM ----------------------- */
 
@@ -599,32 +601,28 @@
         return node;
     }
 
-    function line(parts, cls) {
+    function lineNode(parts, cls) {
         const div = document.createElement('div');
         div.className = 'ln' + (cls ? ' ' + cls : '');
         for (const p of (typeof parts === 'string' ? [parts] : parts)) div.append(partNode(p));
-        out.append(div);
         return div;
     }
+    const line  = (parts, cls) => out.appendChild(lineNode(parts, cls));
     const blank = () => line(' ');
 
-    function pre(text, cls) {
+    function logo() {
         const p = document.createElement('pre');
-        if (cls) p.className = cls;
-        p.textContent = text;
-        out.append(p);
+        p.className = 'logo';
+        p.textContent = LOGO;
+        p.setAttribute('aria-hidden', 'true');        // box-drawing art: eyes only
         return p;
     }
 
     function renderNeo(spec) {
         const wrap = document.createElement('div');
         wrap.className = 'neo';
-        const logo = document.createElement('pre');
-        logo.className = 'logo';
-        logo.textContent = LOGO;
-        logo.setAttribute('aria-hidden', 'true');     // box-drawing art: eyes only
         const info = document.createElement('pre');
-        const hi = (s) => { const n = document.createElement('span'); n.className = 'hi'; n.textContent = s; return n; };
+        const hi = (t) => partNode({ t, c: 'hi' });
         const rule = document.createElement('span');
         rule.textContent = '─'.repeat(22);
         rule.setAttribute('aria-hidden', 'true');
@@ -634,14 +632,14 @@
             for (const p of (Array.isArray(val) ? val : [val])) info.append(partNode(p));
             info.append('\n');
         }
-        info.append('\n');
-        for (const c of spec.palette) {
+        info.append('\n');                            // the swatches: three greys, then the theme's own
+        for (const c of ['#555', '#999', '#ddd', 'var(--fg-dim)', 'var(--fg)', 'var(--fg-hi)']) {
             const s = document.createElement('span');
             s.className = 'sw';
             s.style.background = c;
             info.append(s);
         }
-        wrap.append(logo, info);
+        wrap.append(logo(), info);
         out.append(wrap);
     }
 
@@ -650,7 +648,7 @@
         img.referrerPolicy = 'no-referrer';           // the gif's host needn't learn where it was watched
         img.src = g.src; img.width = g.w; img.alt = g.alt;
         img.onload = scroll;
-        img.onerror = () => { img.remove(); line(g.alt); scroll(); };
+        img.onerror = () => { img.replaceWith(g.alt); scroll(); };
         const div = document.createElement('div');
         div.append(img);
         out.append(div);
@@ -658,7 +656,7 @@
 
     function setTheme(name) {
         document.documentElement.setAttribute('data-theme', name);
-        store.set('mureev:theme', name);
+        try { localStorage.setItem('mureev:theme', name); } catch (e) { /* private mode: this visit only */ }
     }
 
     /** The effect interpreter: Blocks in, side effects out. This is the
@@ -666,7 +664,6 @@
     function applyBlocks(blocks) {
         for (const b of blocks) {
             if (b.ln)         line(b.ln);
-            else if (b.pre)   pre(b.pre, b.cls);
             else if (b.neo)   renderNeo(b.neo);
             else if (b.gif)   renderGif(b.gif);
             else if (b.clear) out.replaceChildren();
@@ -706,10 +703,10 @@
        -------------------------------------------------------------------- */
 
     function render() {
-        const v = kbd.value, s = kbd.selectionStart ?? v.length, g = glyphAt(v, s);
-        bufA.textContent = v.slice(0, s);
-        cur.textContent  = g || ' ';
-        bufB.textContent = v.slice(s + g.length);
+        const v = kbd.value, s = kbd.selectionStart, g = glyphAt(v, s);
+        pre.textContent    = v.slice(0, s);
+        cursor.textContent = g || ' ';
+        post.textContent   = v.slice(s + g.length);
     }
     function setLine(v) {
         kbd.value = v;
@@ -745,10 +742,8 @@
         scroll();
     }
     kbd.addEventListener('input', (e) => {
-        if (!/[\r\n]/.test(kbd.value)) { render(); scroll(); return; }
-        const text = kbd.value;
-        kbd.value = '';
-        enter(text, /^insertFrom/.test(e.inputType));
+        if (/[\r\n]/.test(kbd.value)) enter(kbd.value, /^insertFrom/.test(e.inputType));
+        else { render(); scroll(); }
     });
     document.addEventListener('selectionchange', () => {
         if (document.activeElement === kbd) render();
@@ -761,7 +756,7 @@
         else if (k === 'ArrowDown') { e.preventDefault(); const v = hist.next(); if (v !== null) setLine(v); }
         else if (k === 'Tab' && !e.shiftKey) {        // Shift+Tab is the way out, up into the output
             e.preventDefault();
-            const r = complete(kbd.value, Object.keys(COMMANDS));
+            const r = complete(kbd.value);
             if (r?.set) setLine(r.set);
             else if (r?.list) {
                 line([{ t: PS1, c: 'ps1' }, kbd.value]);
@@ -787,11 +782,10 @@
     document.addEventListener('keydown', (e) => {
         if (booting) { skipBoot = true; return; }
         if (e.target === kbd || e.key === 'Tab') return;
-        const own = e.target.closest?.('a, .cmd');
+        const own = e.target.closest('a, .cmd');
         if (!e.metaKey && !e.ctrlKey && !e.altKey && e.key.length === 1 && !(own && e.key === ' ')) {
             focus();
-            kbd.setRangeText(e.key, kbd.selectionStart ?? kbd.value.length,
-                             kbd.selectionEnd ?? kbd.value.length, 'end');
+            kbd.setRangeText(e.key, kbd.selectionStart, kbd.selectionEnd, 'end');
             e.preventDefault();
             render(); scroll();
         } else if (!own && !selecting()) {
@@ -833,7 +827,7 @@
         focus();
     });
     out.addEventListener('keydown', (e) => {
-        const c = e.target.closest?.('.cmd');
+        const c = e.target.closest('.cmd');
         if (c && (e.key === 'Enter' || e.key === ' ')) { e.preventDefault(); exec(c.dataset.cmd); focus(); }
     });
 
@@ -856,16 +850,12 @@
             scroll();
             await wait(9);
         }
-        div.replaceChildren();                        // swap in the rich version
-        const rich = line(parts); rich.remove();      // (built off-screen)
-        div.append(...rich.childNodes);
-        div.className = rich.className;
-        div.removeAttribute('aria-hidden');
+        div.replaceWith(lineNode(parts));             // the finished line, links and all
         scroll();
     }
 
     (async function boot() {
-        pre(LOGO, 'logo').setAttribute('aria-hidden', 'true');
+        out.append(logo());
         for (const l of GREETING) await typeLine(l);
         blank();
         /* motd prints where a real login puts it — last, right before the
@@ -883,10 +873,7 @@
     /* ---------- hooks & hellos ------------------------------------------- */
 
     /* Exposed for the e2e suite — and for you, console explorer. */
-    window.csh = Object.freeze({
-        VERSION, PS1, THEMES, LOGO, LINKS, GREETING,
-        parse, tenure, clock, Hist, complete, glyphAt, specsheet, dispatch, COMMANDS
-    });
+    window.csh = csh;
 
     console.log('%cmureev.com', 'color:#34ff6d;font-weight:bold',
         '— hand-rolled, zero dependencies. The source you are reading is the product. Agents: your briefing is at /llms.txt');

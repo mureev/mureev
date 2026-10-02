@@ -110,7 +110,8 @@ section('desktop (1440×900)', DESKTOP, async (context) => {
     t = await run('social');
     check('social one-liner', t.includes('Telegram: @mureev'));
     t = await run('neofetch');
-    check('neofetch spec sheet', t.includes('Renmoney') && t.includes('csh — the Constantine shell'));
+    check('neofetch spec sheet', t.includes('Renmoney') && t.includes('csh — the Constantine shell') &&
+        (await page.locator('#out .neo .sw').count()) === 6);
 
     /* themes */
     await run('theme amber');
@@ -145,8 +146,15 @@ section('desktop (1440×900)', DESKTOP, async (context) => {
 
     /* the one thing loaded from elsewhere: the CSP must let the gif in. giphy
        itself is stubbed — this tests our policy, not their CDN */
-    await page.route('https://media1.giphy.com/**', (r) => r.fulfill({ contentType: 'image/gif',
-        body: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64') }));
+    const giphy = (body) => page.route('https://media1.giphy.com/**', (r) => r.fulfill({ contentType: 'image/gif', body }));
+    await giphy('');                                  // the gif that never comes
+    await run('thisistheway');
+    check('a gif that can\'t load leaves its words in its place', await page.waitForFunction(() => {
+        const last = document.querySelector('#out').lastElementChild;
+        return !last.querySelector('img') && last.textContent === 'This is the way.' &&
+            last.previousElementSibling.textContent.endsWith('thisistheway');
+    }, null, { timeout: 3000 }).then(() => true, () => false));
+    await giphy(Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64'));
     await run('thisistheway');
     check('thisistheway: the gif gets through the CSP, sending no referrer', await page.waitForFunction(() => {
         const img = document.querySelector('#out img');

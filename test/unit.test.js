@@ -53,9 +53,7 @@ test('core is DOM-free (no document/window/localStorage/matchMedia)', () => {
         'core references a browser global');
 });
 
-const csh = vm.runInNewContext(
-    core + '\n;({ VERSION, PS1, THEMES, LOGO, LINKS, GREETING, parse, tenure, clock, Hist, complete, glyphAt, specsheet, dispatch, COMMANDS })',
-    {}, { filename: 'csh-core.vm.js' });
+const csh = vm.runInNewContext(core + '\n;csh', {}, { filename: 'csh-core.vm.js' });
 
 test('core evaluates headless and exports the API', () => {
     eq(csh.VERSION, require('../package.json').version, 'index.html VERSION ≠ package.json');
@@ -130,17 +128,17 @@ test('empty push records nothing but resets the walk', () => {
 console.log('\ncompletion');
 const NAMES = Object.keys(csh.COMMANDS);
 test('unique prefix completes with a trailing space', () =>
-    eq(csh.complete('neo', NAMES), { set: 'neofetch ' }));
+    eq(csh.complete('neo'), { set: 'neofetch ' }));
 test('ambiguous prefix lists the candidates', () => {
-    const r = csh.complete('c', NAMES);
+    const r = csh.complete('c');
     ok(r && r.list && r.list.includes('cv') && r.list.includes('contacts') && r.list.includes('clear'));
 });
-test('no match, no action', () => eq(csh.complete('zz', NAMES), null));
-test('empty line, no action', () => eq(csh.complete('', NAMES), null));
+test('no match, no action', () => eq(csh.complete('zz'), null));
+test('empty line, no action', () => eq(csh.complete(''), null));
 test('theme arguments complete too', () =>
-    eq(csh.complete('theme a', NAMES), { set: 'theme amber ' }));
+    eq(csh.complete('theme a'), { set: 'theme amber ' }));
 test('arguments of other commands do not', () =>
-    eq(csh.complete('cv x', NAMES), null));
+    eq(csh.complete('cv x'), null));
 
 /* ---------- the cursor cell ------------------------------------------------ */
 console.log('\nthe cursor cell  (one whole character, however many code units)');
@@ -202,7 +200,6 @@ test('neofetch emits a data-only spec sheet', () => {
     ok(blk.neo, 'no neo block');
     eq(blk.neo.fields.length, 9);
     eq(blk.neo.fields[4], ['Uptime', '16y 11m in software']);
-    eq(blk.neo.palette.length, 6);
 });
 test('theme with no argument lists all five and the current one', () => {
     const t = allText(csh.dispatch('theme', CTX('2026-08-16', 'amber')));
@@ -258,7 +255,6 @@ function vocabularyError(b) {
     const keys = Object.keys(b);
     const only = (...allowed) => keys.every((k) => allowed.includes(k));
     if ('ln' in b)    return only('ln') && Array.isArray(b.ln) && b.ln.every(isPart) ? null : 'malformed ln';
-    if ('pre' in b)   return only('pre', 'cls') && typeof b.pre === 'string' ? null : 'malformed pre';
     if ('neo' in b)   return only('neo') && Array.isArray(b.neo?.fields) ? null : 'malformed neo';
     if ('gif' in b)   return only('gif') && typeof b.gif?.src === 'string' && typeof b.gif?.alt === 'string' ? null : 'malformed gif';
     if ('clear' in b) return only('clear') && b.clear === true ? null : 'malformed clear';
@@ -309,7 +305,7 @@ function survives(raw) {
             'a theme switch from ' + show(raw));
     }
     let r;
-    try { r = csh.complete(raw, NAMES); }
+    try { r = csh.complete(raw); }
     catch (e) { throw new Error(`complete threw on ${show(raw)}: ${e.message}`); }
     ok(r === null || (typeof r.set === 'string' ? r.set.endsWith(' ') && !('list' in r)
         : Array.isArray(r.list) && r.list.length > 1), 'malformed completion for ' + show(raw));
