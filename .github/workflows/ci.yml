@@ -8,8 +8,8 @@ on:
 permissions:
   contents: read
 
-# One run per branch at a time, in push order: a newer push waits for the
-# running one instead of racing it, so :master only ever moves forward.
+# One run per branch at a time: a newer push waits for the running one instead
+# of racing it (and replaces a run still waiting), so :master only moves forward.
 concurrency:
   group: ci-${{ github.ref }}
   cancel-in-progress: false
@@ -23,6 +23,8 @@ jobs:
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false   # nothing here pushes; npm code needn't find a token
       - uses: actions/setup-node@a0853c24544627f65ddf259abe73b1d18a591444 # v5.0.0
         with:
           node-version: 24
@@ -31,20 +33,19 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm test
 
-  # Build once, test that image, ship that image. Delivery (2026-10-01): on master, the image that just
-  # passed goes to GHCR; veesp's docker-autoupdate ("continuous") sees the new :master digest within
-  # ~2 minutes, deploys it behind a health check through nginx and rolls back on failure. The image
-  # carries no CVs: they live only on the server, mounted read-only at /assets/CV.
+  # Build once, test that image, ship that image: the build is set aside before any npm code runs,
+  # and publish — a job that runs none — ships exactly those bytes. This job can't push anything.
   image:
-    name: image — build, test, ship
+    name: image — build and test
     needs: suite
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: read
-      packages: write
+    outputs:
+      sha256: ${{ steps.build.outputs.sha256 }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+        with:
+          persist-credentials: false   # nothing here pushes; npm code needn't find a token
       - name: no PDFs in the image
         run: |
           pdfs=$(git ls-files -- ':(icase)*.pdf')
@@ -56,7 +57,17 @@ jobs:
       # them: the Dockerfile's mode-normalizing layer has to earn its keep —
       # in the very image that ships.
       - run: chmod -R go-rwx conf content
-      - run: docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" -t site .
+      - id: build
+        run: |
+          docker build --platform linux/amd64 --label "org.opencontainers.image.revision=$GITHUB_SHA" -t site .
+          docker save site -o site.tar
+          echo "sha256=$(sha256sum site.tar | cut -d' ' -f1)" >> "$GITHUB_OUTPUT"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: image
+          path: site.tar
+          retention-days: 1
+          if-no-files-found: error
       - run: docker run -d --name site -p 8080:80 site
       - name: Serve like production
         run: |
@@ -84,24 +95,46 @@ jobs:
         run: npm run test:e2e
         env:
           E2E_URL: http://127.0.0.1:8080/
-      - name: publish to GHCR
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      - if: failure()
+        run: docker logs site
+
+  # Delivery (2026-10-01): on master, the tested image goes to GHCR; veesp's docker-autoupdate
+  # ("continuous") sees the new :master digest within ~2 minutes, deploys it behind a health check
+  # through nginx and rolls back on failure. The image carries no CVs: they live only on the
+  # server, mounted read-only at /assets/CV. The only job holding a token that can deploy, and
+  # it runs no third-party code but the artifact download.
+  publish:
+    name: publish to GHCR
+    needs: image
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: image
+      - name: push the tested image
         env:
           ACTOR: ${{ github.actor }}
-          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TESTED: ${{ needs.image.outputs.sha256 }}
         run: |
-          set -eu
+          set -euo pipefail
+          echo "$TESTED  site.tar" | sha256sum -c - || { echo "::error::not the image that was built and tested"; exit 1; }
+          docker load -i site.tar
           IMAGE=ghcr.io/mureev/mureev.com
-          echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          echo "$GH_TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
           docker tag site "$IMAGE:sha-${GITHUB_SHA::7}"
           docker push "$IMAGE:sha-${GITHUB_SHA::7}"
-          # :master follows master's head only — a re-run of an older commit must not roll it back
-          head=$(git ls-remote origin refs/heads/master | cut -f1)
+          # :master follows master's head only — a re-run of an older commit must not roll it back.
+          # If the head can't be read, fail: better a red run than a silent non-deploy.
+          head=$(gh api "repos/$GITHUB_REPOSITORY/commits/master" --jq .sha)
           if [ "$head" != "$GITHUB_SHA" ]; then
             echo "::notice::master is at ${head::7} now and ships itself; this run published sha-${GITHUB_SHA::7} only"
             exit 0
           fi
           docker tag site "$IMAGE:master"
           docker push "$IMAGE:master"
-      - if: failure()
-        run: docker logs site

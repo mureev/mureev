@@ -83,8 +83,8 @@ test/
   e2e.test.js     real Chromium via Playwright: boot, commands, keyboard and
                   screen-reader access, mobile, no-JS
 .github/workflows/ci.yml  the suite, then the image: built once, smoke-tested,
-                  e2e against the container, and that image published
-                  from master
+                  e2e against the container; from master, a job that runs
+                  no npm publishes those very bytes
 .github/workflows/production.yml  daily: the suites against the live site
 tools/make_og.py  regenerates assets/og.png when the card changes (Pillow)
 tools/make_favicon.py  regenerates favicon.ico + apple-touch-icon.png

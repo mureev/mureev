@@ -442,6 +442,10 @@ const watch = (p) => {
         const at = (p) => heads.find(([q]) => q === p)[1];
         check('pages revalidate on every visit; images keep for a day',
             at('/').headers()['cache-control'] === 'no-cache' && at('/assets/og.png').headers()['cache-control'] === 'max-age=86400');
+        const again = await http.get('/assets/og.png', { headers: { 'if-none-match': at('/assets/og.png').headers().etag } });
+        check('…and keep it when revalidated: a 304 sends no cache headers to overrule the day',
+            again.status() === 304 && !again.headers()['cache-control'] && !again.headers().expires,
+            again.status() + ' ' + JSON.stringify(again.headers()['cache-control']));
         check('text says it is utf-8 (llms.txt has em dashes and Cyrillic; RFC 9116 requires it of security.txt)',
             ['/llms.txt', '/.well-known/security.txt'].every((p) => at(p).headers()['content-type'] === 'text/plain; charset=utf-8'));
         check('gzip, and Vary says so', at('/').headers()['content-encoding'] === 'gzip' && /accept-encoding/i.test(at('/').headers().vary));

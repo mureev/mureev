@@ -1,6 +1,8 @@
 # One grouped PR a week per ecosystem: the SHA-pinned actions in
 # .github/workflows/, the nginx base image (the Dockerfile pins its minor
-# version, so these are the deliberate bumps), and Playwright.
+# version, so these are the deliberate bumps — nginx's even minors are
+# stable, the odd ones mainline: merge the even, close the odd, and
+# Dependabot stops offering that one), and Playwright.
 version: 2
 updates:
   - package-ecosystem: github-actions

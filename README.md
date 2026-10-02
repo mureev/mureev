@@ -81,7 +81,8 @@ docker build -t mureev.com . && docker run -p 8080:80 mureev.com
 
 Push to `master` — that is the deploy. CI runs the suites, builds the image
 once, tests that very image (a smoke test, then the e2e suite against it),
-and publishes it to GHCR as `ghcr.io/mureev/mureev.com`. Ship from CI, not
+and publishes those exact bytes to GHCR as `ghcr.io/mureev/mureev.com`, from
+a job that holds the only token that can deploy and runs no npm code. Ship from CI, not
 from a laptop: on Apple Silicon a bare `docker build` produces an arm64
 image that an x86 server politely refuses to run. The server notices the
 new build within a couple of minutes, deploys it behind a health check
