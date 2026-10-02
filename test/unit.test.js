@@ -17,6 +17,7 @@ const fs   = require('fs');
 const path = require('path');
 const vm   = require('vm');
 const zlib = require('zlib');
+const { createHash } = require('crypto');
 
 const HTML_PATH = path.join(__dirname, '..', 'content', 'index.html');
 const html = fs.readFileSync(HTML_PATH, 'utf8');
@@ -434,6 +435,62 @@ for (const theme of csh.THEMES) {
         for (const [k, r] of ratios) ok(r >= 4.5, `${k} = ${t[k]} on ${t['--bg']} is ${r.toFixed(2)}:1`);
     });
 }
+
+/* ---------- the CSP keeps up with the code -------------------------------------
+   Every page carries its own Content-Security-Policy in a <meta>, ahead of
+   anything it governs. Each inline <script> and <style> is allowed by its
+   sha256 and nothing else is, so an edit to one changes its hash and this
+   section goes red, printing the policy to paste. The e2e suite is the
+   second opinion: a stale hash there is a blocked script and a console
+   error. A <script> typed as data (the JSON-LD) never runs, so needs none. */
+console.log('\nCSP  (each page\'s <meta> policy vs. its own inline blocks)');
+const CONTENT = path.join(__dirname, '..', 'content');
+const BLOCKS  = /<!--[\s\S]*?-->|<(script|style)\b([^>]*)>([\s\S]*?)<\/\1\s*>/gi;
+const JS_TYPE = /^(module|(text|application)\/(x-)?(java|ecma)script)$/i;
+const sha256  = (s) => `'sha256-${createHash('sha256').update(s.replace(/\r\n?/g, '\n')).digest('base64')}'`;
+const policyOf = (content) => new Map(content.split(';').map((d) => d.trim().split(/\s+/))
+    .filter(([name]) => name).map(([name, ...sources]) => [name, sources]));
+for (const f of fs.readdirSync(CONTENT).filter((n) => n.endsWith('.html')).sort()) {
+    const page = fs.readFileSync(path.join(CONTENT, f), 'utf8');
+    const metas = [...page.matchAll(/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/g)];
+    const want = { 'script-src': [], 'style-src': [] };
+    let firstBlock = page.length;
+    for (const m of page.matchAll(BLOCKS)) {
+        const [, tag, attrs, body] = m;
+        if (!tag) continue;                                         // a comment
+        firstBlock = Math.min(firstBlock, m.index);
+        const type = (/\btype\s*=\s*["']?([^"'\s>]*)/i.exec(attrs) || [])[1];
+        if (tag.toLowerCase() === 'script' && type && !JS_TYPE.test(type)) continue;   // data, not code
+        want[tag.toLowerCase() === 'script' ? 'script-src' : 'style-src'].push(sha256(body));
+    }
+    test(`${f}: exactly one CSP <meta>, ahead of every <script> and <style>`, () =>
+        ok(metas.length === 1 && metas[0].index < firstBlock,
+            metas.length === 1 ? 'the CSP <meta> must come before the first <script> or <style>' : `${metas.length} CSP <meta> tags`));
+    if (metas.length !== 1) continue;
+    const policy = policyOf(metas[0][1]);
+    test(`${f}: script-src and style-src allow its inline blocks, by hash, and nothing else`, () => {
+        const fixed = new Map(policy);
+        for (const [dir, hashes] of Object.entries(want)) {
+            if (hashes.length) fixed.set(dir, hashes); else fixed.delete(dir);
+        }
+        const line = [...fixed].map(([d, s]) => [d, ...s].join(' ')).join('; ');
+        ok(line === [...policy].map(([d, s]) => [d, ...s].join(' ')).join('; '),
+            `inline code changed; paste this as the CSP <meta> content in ${f}:\n      ${line}`);
+    });
+    test(`${f}: everything else is denied — no base, no forms, no default sources`, () => {
+        for (const d of ['default-src', 'base-uri', 'form-action']) eq(policy.get(d), ["'none'"], d);
+        ok(![...policy.values()].flat().some((s) => /unsafe|^\*$|^(data|blob|https?):$/.test(s)), 'a wildcard or unsafe- source');
+    });
+}
+const INDEX_POLICY = policyOf((/<meta http-equiv="Content-Security-Policy" content="([^"]*)">/.exec(html) || [])[1] || '');
+test('index.html: Trusted Types on, no policies — no string can become markup', () => {
+    eq(INDEX_POLICY.get('require-trusted-types-for'), ["'script'"]);
+    eq(INDEX_POLICY.get('trusted-types'), ["'none'"]);
+});
+test('index.html: img-src admits the gif, and nothing else from elsewhere', () =>
+    eq(INDEX_POLICY.get('img-src'), ["'self'", new URL(csh.LINKS.gif).origin]));
+test('the gif link carries no tracking parameters', () =>
+    ok(!new URL(csh.LINKS.gif).search, csh.LINKS.gif));
 
 /* ---------- whole-file invariants: the soul of the project ------------------ */
 console.log('\ninvariants  (regression tests for the soul of the project)');

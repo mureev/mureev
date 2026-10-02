@@ -107,6 +107,11 @@ titled THE ONE CLEVER TRICK in the source. It is load-bearing.
   the same on every push, plus a smoke test of the built image.
 - Error pages are deliberately self-contained duplicates of the aesthetic,
   not includes — they must render when everything else is on fire.
+- Every page carries its own Content-Security-Policy in a `<meta>`: its
+  inline `<script>` and `<style>` blocks are allowed by sha256, nothing
+  else is, and Trusted Types keep strings from becoming markup. Edit a
+  block and the unit suite fails, printing the policy line to paste. Paste
+  it; never loosen the policy (no `'unsafe-inline'`) to make a test pass.
 - nginx note: `add_header` does not inherit into scopes that declare their
   own `add_header`, and the legacy CORS `if` blocks do. That is why
   X-Clacks-Overhead appears twice in `conf/default.conf`. It is not a

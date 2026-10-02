@@ -20,6 +20,11 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
+    <!-- Nothing runs or renders here unless it shipped in this file, byte
+         for byte: each inline <script> and <style> below is allowed by its
+         sha256, and no string may become markup (Trusted Types). Edit one
+         and the unit suite prints the new line for this tag. -->
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-vqLrIlDdA8d8eBFlTTIf6MoMsNKbOUDfkxZh3TlZNO8='; style-src 'sha256-3v1bAf1qHrakAW97alV77B9BSZVAU0IHCQi6s2zQsyc='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -324,7 +329,7 @@
         renmoney:  'https://renmoney.com',
         cvEn:      'https://mureev.com/assets/CV/Constantine%20Mureev.pdf',
         cvRu:      'https://mureev.com/assets/CV/%D0%9A%D0%BE%D0%BD%D1%81%D1%82%D0%B0%D0%BD%D1%82%D0%B8%D0%BD%20%D0%9C%D1%83%D1%80%D0%B5%D0%B5%D0%B2.pdf',
-        gif:       'https://media1.giphy.com/media/mQI2sfO7U7MOcxoPdn/giphy.gif?cid=4fcb451e614o7scx9x7rm6v3ivvw5pxrsuxa0gzl69ygffbu&rid=giphy.gif&ct=s'
+        gif:       'https://media1.giphy.com/media/mQI2sfO7U7MOcxoPdn/giphy.gif'
     };
 
     /* Output vocabulary — the only shapes a command may produce.
@@ -646,6 +651,7 @@
 
     function renderGif(g) {
         const img = document.createElement('img');
+        img.referrerPolicy = 'no-referrer';           // the gif's host needn't learn where it was watched
         img.src = g.src; img.width = g.w; img.alt = g.alt;
         img.onload = scroll;
         img.onerror = () => { img.remove(); line(g.alt); scroll(); };

@@ -15,6 +15,7 @@
 const { chromium } = require('playwright');
 const path = require('path');
 
+// the page under test (the WHATWG URL class, where needed, is globalThis.URL)
 const URL = 'file://' + path.resolve(__dirname, '..', 'content', 'index.html');
 
 let passed = 0;
@@ -24,15 +25,23 @@ const check = (name, cond, extra = '') => {
     else { failures.push(name); console.log('  \x1b[31m✗ ' + name + '\x1b[0m' + (extra ? '\n      ' + extra : '')); }
 };
 
+/* Every page of the session reports here. CSP and Trusted Types violations
+   are console errors, so a stale hash in a page's policy surfaces as one —
+   and so does anything a page tries to fetch from a host it shouldn't. */
+const errors = [], fetched = [];
+const watch = (p) => {
+    p.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
+    p.on('pageerror', (e) => errors.push(String(e)));
+    p.on('request', (r) => { if (!r.isNavigationRequest()) fetched.push(r.url()); });
+    return p;
+};
+
 (async () => {
     const browser = await chromium.launch();
 
     /* ---------- desktop ---------- */
     console.log('\ndesktop (1440×900)');
-    const page = await browser.newPage({ viewport: { width: 1440, height: 900 } });
-    const errors = [];
-    page.on('console', (m) => { if (m.type() === 'error') errors.push(m.text()); });
-    page.on('pageerror', (e) => errors.push(String(e)));
+    const page = watch(await browser.newPage({ viewport: { width: 1440, height: 900 } }));
 
     await page.goto(URL);
     await page.keyboard.press('Escape');            // any key skips the boot theater
@@ -103,6 +112,16 @@ const check = (name, cond, extra = '') => {
     await page.waitForTimeout(120);
     check('clickable commands execute', (await term()).split('this list').length > before);
 
+    /* the one thing loaded from elsewhere: the CSP must let the gif in. giphy
+       itself is stubbed — this tests our policy, not their CDN */
+    await page.route('https://media1.giphy.com/**', (r) => r.fulfill({ contentType: 'image/gif',
+        body: Buffer.from('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7', 'base64') }));
+    await run('thisistheway');
+    check('thisistheway: the gif gets through the CSP, sending no referrer', await page.waitForFunction(() => {
+        const img = document.querySelector('#out img');
+        return img && img.complete && img.naturalWidth > 0 && img.referrerPolicy === 'no-referrer';
+    }, null, { timeout: 3000 }).then(() => true, () => false));
+
     await run('clear');
     check('clear wipes the scrollback', !(await page.locator('#out').innerText()).trim());
 
@@ -115,15 +134,13 @@ const check = (name, cond, extra = '') => {
     check('window.csh exposed for tests and console explorers',
         api.exposed && api.frozen && api.version === require('../package.json').version);
 
-    check('zero console errors on the whole session', errors.length === 0,
-        errors.join(' | ').slice(0, 300));
 
     /* ---------- keyboard & screen readers ---------- */
     console.log('\nkeyboard & screen readers');
     const ax = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     await ax.grantPermissions(['clipboard-read', 'clipboard-write']);
     await ax.route(/^https?:/, (r) => r.fulfill({ body: '' }));   // links get followed; nothing leaves the machine
-    const kp = await ax.newPage();
+    const kp = watch(await ax.newPage());
     await kp.goto(URL);
     await kp.keyboard.press('Escape');
     await kp.waitForFunction(() => document.querySelector('#out').innerText.includes('motd'));
@@ -231,7 +248,7 @@ const check = (name, cond, extra = '') => {
 
     /* the boot theater, untouched: every greeting line reaches the live
        region once — never character by character */
-    const sr = await ax.newPage();
+    const sr = watch(await ax.newPage());
     await sr.addInitScript(() => document.addEventListener('DOMContentLoaded', () => {
         window.__updates = 0;
         const hidden = (n) => !!(n.nodeType === 1 ? n : n.parentElement)?.closest('[aria-hidden="true"]');
@@ -245,7 +262,7 @@ const check = (name, cond, extra = '') => {
         updates > 0 && updates <= (await sr.evaluate(() => window.csh.GREETING.length)) + 2, updates + ' live updates');
     await sr.close();
 
-    const rm = await ax.newPage();
+    const rm = watch(await ax.newPage());
     await rm.emulateMedia({ reducedMotion: 'reduce' });
     await rm.goto(URL);
     const first = await rm.locator('#out').innerText();
@@ -257,7 +274,7 @@ const check = (name, cond, extra = '') => {
     console.log('\ninput edge cases');
     const ic = await browser.newContext({ viewport: { width: 1440, height: 900 } });
     await ic.grantPermissions(['clipboard-read', 'clipboard-write']);
-    const ip = await ic.newPage();
+    const ip = watch(await ic.newPage());
     await ip.goto(URL);
     await ip.keyboard.press('Escape');
     await ip.waitForFunction(() => document.querySelector('#out').innerText.includes('motd'));
@@ -291,11 +308,11 @@ const check = (name, cond, extra = '') => {
 
     /* ---------- mobile ---------- */
     console.log('\nmobile (390×844, touch)');
-    const mob = await browser.newPage({
+    const mob = watch(await browser.newPage({
         viewport: { width: 390, height: 844 },
         isMobile: true, hasTouch: true,
         userAgent: 'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15'
-    });
+    }));
     await mob.goto(URL);
     await mob.waitForFunction(() =>                  // let the boot type itself out
         document.querySelector('#term').innerText.includes('Type help for commands.'),
@@ -319,7 +336,7 @@ const check = (name, cond, extra = '') => {
     /* ---------- no JavaScript ---------- */
     console.log('\nno-JS fallback');
     const nojs = await browser.newContext({ javaScriptEnabled: false });
-    const np = await nojs.newPage();
+    const np = watch(await nojs.newPage());
     await np.goto(URL);
     check('fallback visible', await np.locator('#fallback').isVisible());
     check('terminal hidden', !(await np.locator('#term').isVisible()));
@@ -329,9 +346,32 @@ const check = (name, cond, extra = '') => {
     check('no dead input: the terminal\'s textarea hides with the terminal',
         !(await np.locator('#kbd').isVisible()) && !(await np.locator('body').ariaSnapshot()).includes('textbox'));
 
+    /* ---------- error pages ---------- */
+    console.log('\nerror pages');
+    for (const name of ['404', '50x']) {
+        const ep = watch(await browser.newPage());
+        await ep.goto(new globalThis.URL(name + '.html', URL).href);
+        check(`${name}.html renders styled, inside its own CSP`, await ep.evaluate(() =>
+            getComputedStyle(document.body).backgroundColor === 'rgb(10, 14, 11)' && document.body.innerText.includes('mureev.com')));
+        await ep.close();
+    }
+
+    /* ---------- the whole session ---------- */
+    console.log('\nthe whole session');
+    check('zero console errors on any page — no CSP or Trusted Types violation among them', errors.length === 0,
+        errors.join(' | ').slice(0, 300));
+    const home = (u) => ['file:', 'data:'].includes(u.protocol) || u.origin === new globalThis.URL(URL).origin;
+    const elsewhere = [...new Set(fetched.map((u) => new globalThis.URL(u)).filter((u) => !home(u)).map((u) => u.host))];
+    check('nothing is fetched from elsewhere but the gif', elsewhere.join() === 'media1.giphy.com', elsewhere.join(', '));
+
     await browser.close();
 
     console.log('\n' + passed + '/' + (passed + failures.length) + ' e2e tests passed'
         + (failures.length ? '  \x1b[31m(' + failures.length + ' failed)\x1b[0m' : ''));
     process.exit(failures.length ? 1 : 0);
-})().catch((e) => { console.error(e); process.exit(1); });
+})().catch((e) => {
+    console.error(e);
+    // a script the CSP blocked tends to surface as a timeout; the console says why
+    if (errors.length) console.error('\nconsole errors so far: ' + errors.join(' | ').slice(0, 500));
+    process.exit(1);
+});
