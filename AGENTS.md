@@ -79,8 +79,9 @@ test/
   unit.test.js    pure core, headless node:vm, zero-dep hand-rolled runner
   e2e.test.js     real Chromium via Playwright: boot, commands, keyboard and
                   screen-reader access, mobile, no-JS
-.github/workflows/ci.yml  the suite, plus the image's smoke test and e2e
-                  against the container, on every push
+.github/workflows/ci.yml  the suite, then the image: built once, smoke-tested,
+                  e2e against the container, and that image published
+                  from master
 tools/make_og.py  regenerates assets/og.png when the card changes (Pillow)
 tools/make_favicon.py  regenerates favicon.ico + apple-touch-icon.png
                   (favicon.svg is hand-written and the design's source of truth)
@@ -108,7 +109,9 @@ titled THE ONE CLEVER TRICK in the source. It is load-bearing.
   compile. `window.csh` is exposed (frozen) for console exploration.
 - `npm ci`, then `npx playwright install chromium` once, then `npm test` —
   unit suite first (fast, no browser), e2e second (real Chromium). CI runs
-  the same on every push, plus a smoke test of the built image.
+  the same on every push, then builds the image once and tests it — a smoke
+  test and the e2e suite against the container — and on master publishes
+  that very image.
 - Error pages are deliberately self-contained duplicates of the aesthetic,
   not includes — they must render when everything else is on fire.
 - Every page carries its own Content-Security-Policy in a `<meta>`: its
@@ -147,7 +150,9 @@ milestone:
   no session links: they point at private sessions, dead for everyone else;
 - nothing rides along — no drive-by fixes, no WIP.
 
-Never push, tag, amend or rewrite history. Publishing is the owner's move.
+Never push, tag, amend or rewrite history. Publishing is the owner's move —
+and a push to `master` *is* a deploy: CI publishes the image, and the server
+rolls it out within minutes.
 
 ## Definition of done
 

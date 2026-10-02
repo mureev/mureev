@@ -1,6 +1,9 @@
 # Only conf/ and content/ enter the image; keep the build context as small
 # as the image. (node_modules alone would otherwise upload megabytes of
 # Playwright to the docker daemon per build, to be used for nothing.)
+# The CVs may sit in content/assets/CV/ on a laptop for local viewing; a
+# local build must not bake them into an image anyway.
+content/assets/CV
 .git
 node_modules
 test

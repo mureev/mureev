@@ -8,6 +8,12 @@ on:
 permissions:
   contents: read
 
+# One run per branch at a time, in push order: a newer push waits for the
+# running one instead of racing it, so :master only ever moves forward.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: false
+
 # Every action is pinned to a full commit SHA (its release tag in the comment), so a
 # moved tag can't change what runs here; Dependabot proposes the updates weekly.
 jobs:
@@ -25,16 +31,32 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - run: npm test
 
+  # Build once, test that image, ship that image. Delivery (2026-10-01): on master, the image that just
+  # passed goes to GHCR; veesp's docker-autoupdate ("continuous") sees the new :master digest within
+  # ~2 minutes, deploys it behind a health check through nginx and rolls back on failure. The image
+  # carries no CVs: they live only on the server, mounted read-only at /assets/CV.
   image:
-    name: image smoke test
+    name: image — build, test, ship
+    needs: suite
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      packages: write
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
+      - name: no PDFs in the image
+        run: |
+          pdfs=$(git ls-files -- ':(icase)*.pdf')
+          if [ -n "$pdfs" ]; then
+            echo "::error::PDFs are tracked; CVs must stay out of the repo and the public image"
+            printf '%s\n' "$pdfs"; exit 1
+          fi
       # Build from owner-only files (0600), the way a sync tool once left
-      # them: the Dockerfile's mode-normalizing layer has to earn its keep.
+      # them: the Dockerfile's mode-normalizing layer has to earn its keep —
+      # in the very image that ships.
       - run: chmod -R go-rwx conf content
-      - run: docker build -t site .
+      - run: docker build --label "org.opencontainers.image.revision=$GITHUB_SHA" -t site .
       - run: docker run -d --name site -p 8080:80 site
       - name: Serve like production
         run: |
@@ -62,49 +84,24 @@ jobs:
         run: npm run test:e2e
         env:
           E2E_URL: http://127.0.0.1:8080/
+      - name: publish to GHCR
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        env:
+          ACTOR: ${{ github.actor }}
+          TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          IMAGE=ghcr.io/mureev/mureev.com
+          echo "$TOKEN" | docker login ghcr.io -u "$ACTOR" --password-stdin
+          docker tag site "$IMAGE:sha-${GITHUB_SHA::7}"
+          docker push "$IMAGE:sha-${GITHUB_SHA::7}"
+          # :master follows master's head only — a re-run of an older commit must not roll it back
+          head=$(git ls-remote origin refs/heads/master | cut -f1)
+          if [ "$head" != "$GITHUB_SHA" ]; then
+            echo "::notice::master is at ${head::7} now and ships itself; this run published sha-${GITHUB_SHA::7} only"
+            exit 0
+          fi
+          docker tag site "$IMAGE:master"
+          docker push "$IMAGE:master"
       - if: failure()
         run: docker logs site
-
-  # Delivery (2026-10-01): when both checks pass on master, publish the image to GHCR. veesp's docker-autoupdate
-  # ("continuous") sees the new :master digest within ~2 minutes, deploys it behind a health check through nginx and
-  # rolls back on failure. The image carries no CVs: they live only on the server, mounted read-only at /assets/CV.
-  release:
-    name: publish image
-    needs: [suite, image]
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    permissions:
-      contents: read
-      packages: write
-    steps:
-      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5.1.0
-      - name: no PDFs in the public image
-        run: |
-          pdfs=$(git ls-files -- ':(icase)*.pdf')
-          if [ -n "$pdfs" ]; then
-            echo "::error::PDFs are tracked; CVs must stay out of the repo and the public image"
-            printf '%s\n' "$pdfs"; exit 1
-          fi
-      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3.12.0
-      - uses: docker/login-action@c94ce9fb468520275223c153574b00df6fe4bcc9 # v3.7.0
-        with:
-          registry: ghcr.io
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-      - id: meta
-        uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
-        with:
-          images: ghcr.io/mureev/mureev.com
-          tags: |
-            type=raw,value=master
-            type=sha,format=short,prefix=sha-
-      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
-        with:
-          context: .
-          platforms: linux/amd64
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max

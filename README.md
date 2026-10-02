@@ -61,13 +61,15 @@ docker build -t mureev.com . && docker run -p 8080:80 mureev.com
 
 ### Release
 
-Push to `master`. CI runs the suite, builds the image for `linux/amd64` and
-publishes it to GHCR as `ghcr.io/mureev/mureev.com` (on Apple Silicon a bare
-`docker build` produces an arm64 image that an x86 server politely refuses
-to run). The server notices the new build within a couple of minutes,
-deploys it behind a health check through its nginx, and rolls itself back if
-the check fails. The CV PDFs — kept private, with their own edit history —
-never enter this repo or the image: production mounts them from the server.
+Push to `master` — that is the deploy. CI runs the suites, builds the image
+once, tests that very image (a smoke test, then the e2e suite against it),
+and publishes it to GHCR as `ghcr.io/mureev/mureev.com`. Ship from CI, not
+from a laptop: on Apple Silicon a bare `docker build` produces an arm64
+image that an x86 server politely refuses to run. The server notices the
+new build within a couple of minutes, deploys it behind a health check
+through its nginx, and rolls itself back if the check fails. The CV PDFs —
+kept private, with their own edit history — never enter this repo or the
+image: production mounts them from the server.
 
 ### Test it
 
@@ -82,10 +84,9 @@ The unit suite slices the engine's pure core out of `index.html` by its
 `@core` markers and runs it with no DOM at all; the e2e suite boots the real
 page in Chromium and types at it like a visitor would — including
 keyboard-only use, what a screen reader is told, a mobile viewport and a
-JavaScript-disabled pass. CI runs both on every push; it also builds the
-image from owner-only (0600) files — so the Dockerfile's permission fix has
-to keep earning its place — and runs the e2e suite again against the
-container.
+JavaScript-disabled pass. CI runs both on every push, then builds the image
+from owner-only (0600) files — so the Dockerfile's permission fix has to keep
+earning its place — and runs the e2e suite again against the container.
 
 ### Map
 
@@ -96,7 +97,7 @@ container.
 | `content/llms.txt` | briefing for AI agents |
 | `conf/` | nginx, and the response headers (note the X-Clacks-Overhead) |
 | `test/` | unit + e2e suites |
-| `.github/workflows/ci.yml` | the suites, plus the image's smoke test and e2e, on every push; publishes the image from `master` |
+| `.github/workflows/ci.yml` | the suites, then the image's smoke test and e2e, on every push; publishes that image from `master` |
 | `tools/` | generators for `og.png` and the favicons |
 | `AGENTS.md` / `CLAUDE.md` | the contract for whoever builds next |
 
