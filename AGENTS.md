@@ -73,8 +73,8 @@ content/
   .well-known/security.txt  where to report a vulnerability (RFC 9116)
   assets/                   og.png; CV/ is mounted in production, never committed
 conf/
-  default.conf              nginx: static files, caching, text for shells, CORS (legacy, leave it), 404/50x
-  security-headers.inc      the response headers, declared once (see the nginx note)
+  default.conf              nginx: static files, caching, text for shells, 404/50x
+  security-headers.inc      the response headers, all in one place
 Dockerfile                  pinned nginx + conf + content, file modes normalized
 test/
   unit.test.js              the core in a bare node:vm; zero-dep runner
@@ -119,10 +119,6 @@ titled THE ONE CLEVER TRICK in the source. It is load-bearing.
   else is, and Trusted Types keep strings from becoming markup. Edit a
   block and the unit suite fails, printing the policy line to paste. Paste
   it; never loosen the policy (no `'unsafe-inline'`) to make a test pass.
-- nginx note: `add_header` does not inherit into scopes that declare their
-  own `add_header`, and the legacy CORS `if` blocks do. That is why
-  `conf/security-headers.inc` is included twice in `conf/default.conf`; the
-  served e2e run fails if either include goes.
 - `file://` sends no headers, so what only a server can get wrong is checked
   against a served copy: `E2E_URL=http://127.0.0.1:8080/ npm run test:e2e`
   with the image running (see README). CI does exactly that.

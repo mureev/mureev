@@ -1,8 +1,6 @@
 # The response headers this site adds, in one place. default.conf includes
-# this file twice — at server level and inside the GET `if` — for the reason
-# given there. All `always`, so 404s and 50xs carry them too. (The legacy
-# CORS blocks answer OPTIONS and POST on their own, without these: a
-# preflight and a 405 are never pages.)
+# this file once, at server level. All `always`, so 404s and 50xs carry them
+# too.
 #
 # Each page carries its own Content-Security-Policy in a <meta>; this file
 # says what a <meta> can't. Left out on purpose: HSTS (the TLS proxy in
