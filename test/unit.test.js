@@ -228,9 +228,22 @@ test('thisistheway ships the gif with a spoken fallback', () => {
     eq(blk.gif.w, 200);
 });
 test('unknown commands fail politely, help one click away', () => {
-    const blocks = csh.dispatch('sudo', CTX());
-    ok(allText(blocks).includes('csh: command not found: sudo'));
+    const blocks = csh.dispatch('rm -rf /', CTX());
+    ok(allText(blocks).includes('csh: command not found: rm'));
     ok(blocks[0].ln.some((p) => p.cmd === 'help'));
+});
+test('sudo answers like sudo, and is not a command', () => {
+    const blocks = csh.dispatch('sudo make me a sandwich', CTX());
+    eq(blocks, [{ ln: [{ t: 'constantine is not in the sudoers file.  This incident will be reported.', c: 'err' }] }]);
+    ok(!('sudo' in csh.COMMANDS));
+});
+test('the motd is one line a day, each from the pool, the pool walked day by day', () => {
+    const day = (n) => new Date(Date.UTC(2026, 9, 3 + n, 12));
+    eq(csh.motd(day(0)), csh.motd(new Date(Date.UTC(2026, 9, 3, 23, 59))), 'changed within the day');
+    const seen = new Set();
+    for (let n = 0; n < csh.MOTD.length; n++) seen.add(csh.motd(day(n)));
+    eq([...seen].sort(), csh.MOTD.map((l) => 'motd: ' + l).sort(), 'the pool is not walked in full');
+    for (const l of csh.MOTD) ok(l.length > 0 && l.length <= 72 && l === l.trim(), 'a motd line is empty, padded, or too long for a phone: ' + l);
 });
 test('prototype names are not commands (constructor, __proto__)', () => {
     for (const n of ['constructor', '__proto__', 'CONSTRUCTOR'])

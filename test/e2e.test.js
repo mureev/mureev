@@ -91,7 +91,7 @@ section('desktop (1440×900)', DESKTOP, async (context) => {
     };
 
     check('boot greeting rendered', (await term()).includes("G'day, I'm Constantine Mureev."));
-    check('motd plants the flag', (await term()).includes('zero dependencies'));
+    check('the motd is today\'s, from the pool', (await term()).includes(await page.evaluate(() => csh.motd(new Date()))));
 
     let t = await run('help');
     check('help lists the full registry', t.includes('thisistheway') && t.includes('neofetch') && t.includes('theme'));
@@ -125,13 +125,15 @@ section('desktop (1440×900)', DESKTOP, async (context) => {
 
     /* the shell around the commands */
     t = await run('sudo');
-    check('unknown command → csh error', t.includes('csh: command not found: sudo'));
+    check('sudo answers like sudo', t.includes('constantine is not in the sudoers file.  This incident will be reported.'));
+    t = await run('rm -rf /');
+    check('unknown command → csh error', t.includes('csh: command not found: rm'));
     await page.keyboard.press('ArrowUp');
     await page.waitForTimeout(60);
-    check('history ↑ recalls', (await page.locator('#row').innerText()).includes('sudo'));
+    check('history ↑ recalls', (await page.locator('#row').innerText()).includes('rm -rf /'));
     await page.keyboard.press('ArrowUp');
     await page.waitForTimeout(60);
-    check('history ↑↑ walks back', (await page.locator('#row').innerText()).includes('theme green'));
+    check('history ↑↑ walks back', (await page.locator('#row').innerText()).includes('sudo'));
     await page.keyboard.press('Control+c');
     await page.keyboard.type('neo', { delay: 5 });
     await page.keyboard.press('Tab');
@@ -172,6 +174,18 @@ section('desktop (1440×900)', DESKTOP, async (context) => {
     }));
     check('window.csh exposed for tests and console explorers',
         api.exposed && api.frozen && api.version === require('../package.json').version);
+
+    /* the way out of any shell */
+    await page.keyboard.type('about');
+    await page.keyboard.press('Control+d');
+    await page.waitForTimeout(60);
+    check('^D with a line half-typed does nothing', (await page.locator('#kbd').inputValue()) === 'about' && (await page.locator('#row').count()) === 1);
+    await page.keyboard.press('Control+u');
+    await page.keyboard.press('Control+d');
+    await page.waitForTimeout(60);
+    t = await term();
+    check('^D on an empty line logs out, and the prompt is gone',
+        /logout\nConnection to mureev\.com closed\.\s*$/.test(t) && (await page.locator('#row').count()) === 0 && (await page.locator('#kbd').count()) === 0);
 });
 
 /* ---------- keyboard & screen readers ---------- */

@@ -30,5 +30,5 @@ boots into a terminal at https://mureev.com/ — the facts are the same.
 
 ## Colophon
 
-The terminal is written by hand — no frameworks, no build step, one
+The terminal is hand-rolled — no frameworks, no build step, one
 self-contained HTML file whose source is documented for readers like you.

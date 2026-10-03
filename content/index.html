@@ -21,7 +21,7 @@
     <!-- Only this file's own code runs here: each inline <script> and <style>
          is allowed by its sha256, and no string becomes markup (Trusted Types).
          Edit one, and the unit suite prints this tag's new policy. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-+0WGjcDwrCHPrRJ5gvVgYIMVZ7LPZThcZJVq5WdKRzI='; style-src 'sha256-eqPT3sKuMfHYOsHEZ3+5HGxV9HSdwindRpK+m5vOQLA='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-dpbcypgskCda5Ry3Tuv17YPkfTwHZOd1Wkdb2sOB99Q='; style-src 'sha256-eqPT3sKuMfHYOsHEZ3+5HGxV9HSdwindRpK+m5vOQLA='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -360,6 +360,21 @@
         ['Type ', { t: 'help', cmd: 'help' }, ' for commands.']
     ];
 
+    /** The message of the day: one a day, each true, none that can go stale. */
+    const MOTD = [
+        'hand-rolled terminal · zero dependencies · no frameworks were harmed',
+        '14 KB gzipped · a floppy holds a hundred of these',
+        'a terminal, not a costume · ^C works',
+        'load average 0.42 0.99 1.00 · same as the owner\'s',
+        'free as in MIT · the biography is not',
+        'GNU Terry Pratchett',
+        'this is the way',
+        'written by agents · directed by a human · argued over by both'
+    ];
+    function motd(now) {
+        return 'motd: ' + MOTD[Math.floor(now / 864e5) % MOTD.length];
+    }
+
     /** @param {string} raw @returns {string[]} argv, shell-style */
     function parse(raw) {
         return raw.trim().split(/\s+/).filter(Boolean);
@@ -548,6 +563,7 @@
         const name = argv[0].toLowerCase();
         // own keys only — 'constructor' is not a command
         const c = Object.prototype.hasOwnProperty.call(COMMANDS, name) ? COMMANDS[name] : null;
+        if (name === 'sudo') return [{ ln: [{ t: 'constantine is not in the sudoers file.  This incident will be reported.', c: 'err' }] }];
         if (!c) return [{ ln: [{ t: `csh: command not found: ${argv[0]}`, c: 'err' },
                                ' — try ', { t: 'help', cmd: 'help' }] }];
         return c.run(argv[1]?.toLowerCase(), ctx);
@@ -556,8 +572,8 @@
     /** All of the above that anyone else gets: the shell hands it to the
         console, and the unit suite reads it back out of its node:vm. */
     const csh = Object.freeze({
-        VERSION, PS1, THEMES, LOGO, LINKS, GREETING,
-        parse, tenure, clock, Hist, complete, glyphAt, specsheet, dispatch, COMMANDS
+        VERSION, PS1, THEMES, LOGO, LINKS, GREETING, MOTD,
+        parse, tenure, clock, Hist, complete, glyphAt, specsheet, dispatch, motd, COMMANDS
     });
 
     /* @core-end */
@@ -774,6 +790,11 @@
         }
         else if (k === 'l' && e.ctrlKey) { e.preventDefault(); out.replaceChildren(); scroll(); }
         else if (k === 'u' && e.ctrlKey) { e.preventDefault(); setLine(''); }
+        else if (k === 'd' && e.ctrlKey && !kbd.value) {   // ^D leaves, as in any shell
+            e.preventDefault();
+            line([{ t: PS1, c: 'ps1' }]); line('logout'); line([{ t: 'Connection to mureev.com closed.', c: 'dim' }]);
+            row.remove(); kbd.remove(); scroll();
+        }
     });
 
     /* Focus routing: physical keys land in the sink even if focus wandered;
@@ -865,7 +886,7 @@
         blank();
         /* motd prints where a real login puts it — last, right before the
            prompt. A system whisper, not a headline. */
-        line([{ t: 'motd: hand-rolled terminal · zero dependencies · no frameworks were harmed', c: 'dim' }]);
+        line([{ t: motd(ctx.now()), c: 'dim' }]);
         if (matchMedia('(pointer: coarse)').matches && document.activeElement !== kbd) {
             line([{ t: '[tap anywhere to type]', c: 'dim' }]);   // unless the tap came during the boot
         }
@@ -883,9 +904,9 @@
     console.log('%cmureev.com', 'color:#34ff6d;font-weight:bold',
         '— hand-rolled, zero dependencies. The source you are reading is the product. Agents: your briefing is at /llms.txt');
 
-    /*  zero dependencies —
+    /*  no dependencies —
         the cursor blinks by itself.
-        view source. found you.  */
+        view the source. found you.  */
     </script>
 </body>
 </html>
