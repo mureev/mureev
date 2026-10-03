@@ -166,14 +166,25 @@ section('desktop (1440×900)', DESKTOP, async (context) => {
     await run('clear');
     check('clear wipes the scrollback', !(await page.locator('#out').innerText()).trim());
 
-    /* the hooks */
-    const api = await page.evaluate(() => ({
-        exposed: typeof window.csh === 'object',
-        frozen: Object.isFrozen(window.csh),
-        version: window.csh?.VERSION
-    }));
+    /* the hooks: one name on window, on purpose — the engine is a module,
+       so everything else it declares stays its own */
+    const api = await page.evaluate(() => {
+        const frame = document.body.appendChild(document.createElement('iframe'));
+        const native = new Set(Object.getOwnPropertyNames(frame.contentWindow));   // a fresh window, same origin
+        frame.remove();
+        return {
+            exposed: typeof window.csh === 'object',
+            frozen: Object.isFrozen(window.csh),
+            version: window.csh?.VERSION,
+            added: Object.getOwnPropertyNames(window).filter((n) => !native.has(n)),
+            kept: typeof VERSION === 'undefined' && typeof Hist === 'undefined' &&
+                Function.prototype.toString.call(window.scroll).includes('[native code]')
+        };
+    });
     check('window.csh exposed for tests and console explorers',
         api.exposed && api.frozen && api.version === require('../package.json').version);
+    check('…and it is the only name the page adds: the rest stays in the engine, and window.scroll is still the browser\'s',
+        JSON.stringify(api.added) === '["csh"]' && api.kept, JSON.stringify(api.added));
 
     /* the way out of any shell */
     await page.keyboard.type('about');

@@ -109,7 +109,9 @@ titled THE ONE CLEVER TRICK in the source. It is load-bearing.
 ## Working here
 
 - Develop by opening `content/index.html` in a browser. There is nothing to
-  compile. `window.csh` is exposed (frozen) for console exploration.
+  compile. `window.csh` is exposed (frozen) for console exploration, and it
+  is the page's only global: the engine is a module script, and the e2e
+  suite fails on any other name.
 - `npm ci`, then `npx playwright install chromium` once, then `npm test` —
   unit suite first (fast, no browser), e2e second (real Chromium).
 - Error pages are deliberately self-contained duplicates of the aesthetic,
