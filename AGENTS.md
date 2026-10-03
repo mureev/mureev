@@ -114,6 +114,9 @@ titled THE ONE CLEVER TRICK in the source. It is load-bearing.
   unit suite first (fast, no browser), e2e second (real Chromium).
 - Error pages are deliberately self-contained duplicates of the aesthetic,
   not includes — they must render when everything else is on fire.
+- The CVs are the owner's documents: they live on the server, production
+  mounts them, and neither the repo nor the image ever holds them. Never
+  generate or edit them.
 - Every page carries its own Content-Security-Policy in a `<meta>`: its
   inline `<script>` and `<style>` blocks are allowed by sha256, nothing
   else is, and Trusted Types keep strings from becoming markup. Edit a

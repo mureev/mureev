@@ -1,23 +1,11 @@
 # CLAUDE.md
 
-**Read `AGENTS.md` first.** It is the contract; this file only adds
-Claude-specific working notes. If the two ever disagree, AGENTS.md wins and
-this file has a bug — fix it.
+Read @AGENTS.md first: it is the contract, and this file only adds what is
+specific to Claude. If the two ever disagree, AGENTS.md wins and this file
+has a bug — fix it.
 
-## Working notes
-
-- `npm test` runs everything: `test/unit.test.js` (zero-dep, headless,
-  seconds) then `test/e2e.test.js` (Playwright + Chromium). Run the unit
-  suite after every core edit; run both before calling anything done.
-- The pure core lives between `/* @core-start */` and `/* @core-end */` in
-  `content/index.html`. If your edit needs `document` inside those markers,
-  your edit is in the wrong place — return a Block and let the shell render it.
-- Branch is `master`. Commit per AGENTS.md → Commits (one approved, tested
-  milestone per commit); never push. Trailers: `Co-Authored-By` only — leave
-  out the `Claude-Session:` line your harness suggests.
-- Never ship unreviewed: build the change, render it (open the file or
-  screenshot it), show the owner, then apply. This repo has already rolled
-  back one confident big-bang refresh; see "History" in AGENTS.md.
+Commit trailers: `Co-Authored-By` only. Leave out the `Claude-Session:` line
+your harness suggests.
 
 ## Git on a filesystem that can't delete
 
@@ -38,10 +26,3 @@ after itself by deleting, so:
   `clean`, `rm`. Restore a tracked file by overwriting it in place.
 - If git reports an existing `*.lock`, stop and tell the owner. Don't
   retry, don't work around it.
-
-## Content changes
-
-Facts (employer, links, title) are repeated on purpose — AGENTS.md rule 6
-lists every copy; change all of them, and the matching tests. The CV PDFs
-are never in this repo or the image: production mounts them from the server.
-Never generate or edit them.
