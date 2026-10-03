@@ -46,18 +46,18 @@ build.
    accident — he chose "modest additions" over a deep easter-egg drawer.
    Do not add commands, sections, or facts without his sign-off.
 6. **The copy is the owner's voice.** "G'day", the rocket, the Mandalorian
-   gif — these stay. Never rewrite, "improve", or translate his words
-   silently. Facts (title, employer, location, links) are repeated on
-   purpose, so a change touches every copy: `LINKS`, `GREETING` and the
-   command bodies in the core (incl. `neofetch`'s spec sheet), the `<head>`
-   (title, description, OG, JSON-LD), the no-JS `#fallback`, `llms.txt`,
-   `index.txt` (the session as text, for curl), the contact in
-   `.well-known/security.txt`, the card in `assets/og.png` (regenerate with
-   `tools/make_og.py`), and the profile intro at the top of `README.md` — it
-   is the owner's GitHub profile. The unit suite holds `#fallback`,
-   `llms.txt`, `index.txt`, the JSON-LD, `security.txt` and the README intro
-   to `LINKS` and the greeting; the rest of the `<head>` and `og.png` are on
-   you.
+   gif, every line of the motd — these stay. Never rewrite, "improve", or
+   translate his words silently. Facts (title, employer, location, links)
+   are repeated on purpose, so a change touches every copy: `LINKS`,
+   `GREETING` and the command bodies in the core (incl. `neofetch`'s spec
+   sheet), the `<head>` (title, description, OG, JSON-LD), the no-JS
+   `#fallback`, `llms.txt`, `index.txt` (the session as text, for curl), the
+   contact in `.well-known/security.txt`, the card in `assets/og.png`
+   (regenerate with `tools/make_og.py`), and the profile intro at the top of
+   `README.md` — it is the owner's GitHub profile. The unit suite holds
+   `#fallback`, `llms.txt`, `index.txt`, the JSON-LD, `security.txt` and the
+   README intro to `LINKS` and the greeting; the rest of the `<head>` and
+   `og.png` are on you.
 7. **Everything user-visible gets a test.** Core change → unit test. Behavior
    change → e2e test. A change with no test is half a change.
 
