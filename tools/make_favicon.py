@@ -10,6 +10,7 @@ a phosphor prompt chevron and a lit block cursor on the terminal's dark tile.
 
 Run from the repo root: python3 tools/make_favicon.py  (needs Pillow)
 favicon.svg is the source of truth for the design; keep them in sync.
+Changed the art? Bump ?v= on the icon links in content/index.html too.
 """
 from PIL import Image, ImageDraw, ImageFilter
 
