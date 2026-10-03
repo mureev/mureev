@@ -21,7 +21,7 @@
     <!-- Only this file's own code runs here: each inline <script> and <style>
          is allowed by its sha256, and no string becomes markup (Trusted Types).
          Edit one, and the unit suite prints this tag's new policy. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IpWjq/CNuxLmxwsD5hiu6+6lFWLUNvg4vf8em+wm5u4=' 'sha256-/2hB/ghPyqtt31WgON5Y00ioA7MP8Ex0IKSOgWCOfMQ='; style-src 'sha256-eqPT3sKuMfHYOsHEZ3+5HGxV9HSdwindRpK+m5vOQLA='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IpWjq/CNuxLmxwsD5hiu6+6lFWLUNvg4vf8em+wm5u4=' 'sha256-RC7AJHeBSXAQl99/T2HUTZ/G6GAwE7ULf5x/MHYQ9Ig='; style-src 'sha256-U9DT7HB7vcHkT75AZkX9smZulavzCRkkJWAwJw0dspI='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -79,7 +79,7 @@
 
     <style>
         /* ---------------------------------------------------------------
-           Phosphor. Default theme is green; amber/mono/crt/flat via the
+           Phosphor. Default theme is green; amber/mono/crt/dracula via the
            `theme` command (persisted in localStorage when allowed).
            Themes are pure CSS: one data-theme attribute on <html>, zero
            JS involvement beyond setting it. Every --fg* clears WCAG AA
@@ -99,15 +99,15 @@
             --fg-hi: #ffe9c4; --glow: 0 0 6px rgba(255, 176, 0, .38);
         }
         html[data-theme="mono"] {
-            --bg: #050505; --fg: #d8d8d8; --fg-dim: rgba(216, 216, 216, .55);
-            --fg-hi: #ffffff; --glow: 0 0 5px rgba(255, 255, 255, .22);
+            --bg: #06080b; --fg: #e4ecf4; --fg-dim: rgba(228, 236, 244, .55);
+            --fg-hi: #ffffff; --glow: 0 0 7px rgba(214, 228, 255, .5);
         }
         html[data-theme="crt"] {
             --scan: .22;
         }
-        html[data-theme="flat"] {
-            --bg: #000000; --fg: #d8d8d8; --fg-dim: rgba(216, 216, 216, .55);
-            --fg-hi: #ffffff; --glow: none; --scan: 0;
+        html[data-theme="dracula"] {
+            --bg: #282a36; --fg: #f8f8f2; --fg-dim: #a4abcd;
+            --fg-hi: #bd93f9; --glow: none; --scan: 0;
         }
 
         * { box-sizing: border-box; }
@@ -201,7 +201,7 @@
             93% { opacity: .82; } 94% { opacity: 1; } 97% { opacity: .93; }
         }
         @keyframes sweep { 0% { top: -25%; } 100% { top: 115%; } }
-        html[data-theme="flat"] #fx { display: none; }
+        html[data-theme="dracula"] #fx { display: none; }
 
         @media (prefers-reduced-motion: reduce) {
             #cursor { animation: none; }
@@ -309,7 +309,7 @@
 
     const VERSION = '3.3.0';
     const PS1     = 'constantine@mureev.com:~$ ';
-    const THEMES  = ['green', 'amber', 'mono', 'crt', 'flat'];
+    const THEMES  = ['green', 'amber', 'mono', 'crt', 'dracula'];
     const LOGO    = [
         ' ██████╗███╗   ███╗',
         '██╔════╝████╗ ████║',
@@ -530,8 +530,7 @@
                     { ln: [{ t: 'usage: theme <name>', c: 'dim' }] }
                 ];
                 if (THEMES.includes(arg)) return [
-                    { ln: [{ t: `theme set to ${arg}`, c: 'dim' },
-                        arg === 'flat' ? { t: ' — very 2017.', c: 'dim' } : ''] },
+                    { ln: [{ t: `theme set to ${arg}`, c: 'dim' }] },
                     { theme: arg }
                 ];
                 return [{ ln: [{ t: `theme: unknown theme: ${arg}`, c: 'err' }] }];
@@ -582,7 +581,7 @@
 
     const ctx  = {
         now:   () => new Date(),
-        theme: () => document.documentElement.getAttribute('data-theme') || 'green'
+        theme: () => { const t = document.documentElement.getAttribute('data-theme'); return THEMES.includes(t) ? t : 'green'; }   // a retired theme shows as green
     };
     const hist = new Hist();
 

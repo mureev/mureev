@@ -212,9 +212,6 @@ test('theme <name> confirms and emits the switch effect', () => {
     ok(allText(blocks).includes('theme set to amber'));
     eq(blocks[blocks.length - 1], { theme: 'amber' });
 });
-test('flat theme owns its past', () => {
-    ok(allText(csh.dispatch('theme flat', CTX())).includes('very 2017.'));
-});
 test('unknown theme is an error, not an effect', () => {
     const blocks = csh.dispatch('theme neon', CTX());
     ok(allText(blocks).includes('unknown theme: neon'));
@@ -393,7 +390,7 @@ test('the command set is the approved eleven (AGENTS.md rule 5 — change only w
     eq(NAMES, ['help', 'about', 'contacts', 'cv', 'social', 'whoami', 'uptime',
         'neofetch', 'theme', 'clear', 'thisistheway']));
 test('the themes are the approved five', () =>
-    eq(csh.THEMES, ['green', 'amber', 'mono', 'crt', 'flat']));
+    eq(csh.THEMES, ['green', 'amber', 'mono', 'crt', 'dracula']));
 test('security.txt: the site\'s email, and an Expires date at most a year out (RFC 9116)', () => {
     const txt = fs.readFileSync(path.join(CONTENT, '.well-known', 'security.txt'), 'utf8');
     const field = (name) => (new RegExp('^' + name + ': *(.+)$', 'm').exec(txt) || [])[1];

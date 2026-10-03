@@ -121,6 +121,10 @@ section('desktop (1440×900)', DESKTOP, async (context) => {
     check('theme survives a reload (localStorage)', (await theme()) === 'amber', await theme());
     await run('theme crt');
     check('theme crt applies', (await theme()) === 'crt');
+    await page.evaluate(() => localStorage.setItem('mureev:theme', 'flat'));
+    await page.reload();
+    await skipBoot(page);
+    check('a theme that no longer exists reads as green', (await run('theme')).includes('(current: green)'));
     await run('theme green');
 
     /* the shell around the commands */
