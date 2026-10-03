@@ -21,7 +21,7 @@
     <!-- Only this file's own code runs here: each inline <script> and <style>
          is allowed by its sha256, and no string becomes markup (Trusted Types).
          Edit one, and the unit suite prints this tag's new policy. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-7AkX91tawrCIDGCDDB3caDxOi7HTP/EQICOwMYPPAWw='; style-src 'sha256-eqPT3sKuMfHYOsHEZ3+5HGxV9HSdwindRpK+m5vOQLA='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ZXn9r9OgvrLm9wScrZbPYI+kgJhL+BaNWNIRUWbZppM=' 'sha256-+0WGjcDwrCHPrRJ5gvVgYIMVZ7LPZThcZJVq5WdKRzI='; style-src 'sha256-eqPT3sKuMfHYOsHEZ3+5HGxV9HSdwindRpK+m5vOQLA='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -671,13 +671,16 @@
         }
     }
 
-    /** Scroll the prompt to the bottom of what can be seen: above the
-        keyboard when one is up, since a phone's keyboard shrinks the visual
-        viewport and (on iOS) not the page. A screen with less to show than
-        that simply stops at its top, which is where a cleared one belongs. */
+    /** Keep the prompt in sight: when it has gone below what can be seen —
+        after new output, or under a phone's keyboard, which shrinks the
+        visual viewport and (on iOS) not the page — bring it to the bottom of
+        that. A prompt in sight is left where it is: the phone scrolls on its
+        own too, and two hands on one wheel made every key a jolt. A screen
+        with less to show stops at its top, which is where a cleared one belongs. */
     function scroll() {
-        const vv = window.visualViewport, gap = parseFloat(getComputedStyle(term).paddingBottom);
-        window.scrollBy(0, row.getBoundingClientRect().bottom + gap - (vv ? vv.offsetTop + vv.height : innerHeight));
+        const vv = window.visualViewport, seen = vv ? vv.offsetTop + vv.height : innerHeight;
+        const below = row.getBoundingClientRect().bottom + parseFloat(getComputedStyle(term).paddingBottom) - seen;
+        if (below > 1) window.scrollBy(0, below);
     }
     /* The keyboard came or went, or the phone turned: keep the prompt in
        view while it's in use — but leave a pinch-zoomed view alone. */
@@ -811,7 +814,9 @@
     /* Tap to type. A phone raises its keyboard only for a focus given during
        a touch event, and the click that follows a tap would blur it again,
        so the tap is taken at touchend and cancelled. For the same reason the
-       page has no mouse listeners: on iOS one alone makes every tap a click. */
+       page has no mouse listeners: on iOS one alone makes every tap a click.
+       A tap during the boot skips it (at pointerup) and asks to type, both:
+       no later moment raises a phone's keyboard without another tap. */
     let tap = null;                                   // where a one-finger touch began, until it moves
     document.addEventListener('touchstart', (e) => {
         tap = e.touches.length === 1 ? [e.touches[0].clientX, e.touches[0].clientY] : null;
@@ -822,7 +827,7 @@
     document.addEventListener('touchend', (e) => {
         const tapped = tap && !e.touches.length;
         tap = null;
-        if (booting || !tapped || e.target.closest('a, .cmd') || selecting()) return;
+        if (!tapped || e.target.closest('a, .cmd') || selecting()) return;
         e.preventDefault();
         focus();
     });
@@ -861,8 +866,8 @@
         /* motd prints where a real login puts it — last, right before the
            prompt. A system whisper, not a headline. */
         line([{ t: 'motd: hand-rolled terminal · zero dependencies · no frameworks were harmed', c: 'dim' }]);
-        if (matchMedia('(pointer: coarse)').matches) {
-            line([{ t: '[tap anywhere to type]', c: 'dim' }]);
+        if (matchMedia('(pointer: coarse)').matches && document.activeElement !== kbd) {
+            line([{ t: '[tap anywhere to type]', c: 'dim' }]);   // unless the tap came during the boot
         }
         booting = false;
         render();

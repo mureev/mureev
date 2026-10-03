@@ -509,13 +509,15 @@ section('the keyboard (simulated)', PHONE, async (context) => {
         Object.defineProperty(window, 'visualViewport', { value: vv, configurable: true });
         window.__keyboard = (h, panned = 0) => {
             keys = h; pan = panned;
-            document.body.style.paddingBottom = h + 'px';   // the extra scroll range iOS adds
+            document.body.style.paddingBottom = (h && h + 60) + 'px';   // the scroll range iOS adds, and some slack: its bars come and go
             vv.dispatchEvent(new Event('resize'));
         };
     });
     await page.goto(SITE);
-    await skipBoot(page);
-    await page.locator('#out pre.logo').first().tap();
+    await page.locator('#out pre.logo').first().tap();      // during the boot: the greeting is still typing
+    await page.waitForFunction(() => document.querySelector('#out').innerText.includes('motd'));
+    check('a tap during the boot skips it and raises the keyboard; the tap hint is spared',
+        (await page.evaluate(() => document.activeElement.id)) === 'kbd' && !(await page.locator('#out').innerText()).includes('[tap anywhere'));
     for (let i = 0; i < 4; i++) { await page.keyboard.type('help'); await page.keyboard.press('Enter'); }
     const where = () => page.evaluate(() => {
         const vv = window.visualViewport, r = document.getElementById('row').getBoundingClientRect();
@@ -525,10 +527,26 @@ section('the keyboard (simulated)', PHONE, async (context) => {
     await page.evaluate(() => __keyboard(320));
     const up = await where();
     check('the keyboard comes up: the prompt sits right above it', sitsAbove(up), JSON.stringify(up));
+    /* iOS then scrolls on its own after every key, to keep the caret in view
+       with a margin — a little higher than the page put it. The page must not
+       argue: typing is no reason to move a prompt that can be seen. */
+    await page.evaluate(() => window.scrollBy(0, 24));
+    await page.keyboard.type('abc');
+    await page.waitForTimeout(100);
+    const typed = await where();
+    check('typing moves nothing: a prompt in sight stays where the phone put it', typed.y === up.y + 24 && typed.bottom <= typed.seen,
+        JSON.stringify({ before: up.y + 24, after: typed.y }));
     await page.evaluate(() => __keyboard(320, 140));
     const panned = await where();
-    check('…and stays there when iOS pans the visible part of the page', sitsAbove(panned), JSON.stringify(panned));
+    check('…and so it does when iOS pans the visible part of the page', panned.y === typed.y && panned.bottom <= panned.seen && panned.top >= 140,
+        JSON.stringify(panned));
     await page.evaluate(() => __keyboard(320));
+    await page.evaluate(() => window.scrollTo(0, 0));        // scrolled up to read, then a key
+    await page.keyboard.type('d');
+    await page.waitForTimeout(100);
+    const back = await where();
+    check('a key after scrolling up to read brings the prompt back above the keyboard', sitsAbove(back), JSON.stringify(back));
+    await page.keyboard.press('Control+u');
     await page.keyboard.type('clear'); await page.keyboard.press('Enter');
     const cleared = await where();
     check('clear after a long session: back to the top, the prompt in view', cleared.y === 0 && cleared.top >= 0 && cleared.bottom <= cleared.seen,
