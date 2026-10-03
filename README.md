@@ -15,8 +15,10 @@ Constantine Mureev
 ## This repo is [mureev.com](https://mureev.com)
 
 [![ci](https://github.com/mureev/mureev/actions/workflows/ci.yml/badge.svg)](https://github.com/mureev/mureev/actions/workflows/ci.yml)
+[![production](https://github.com/mureev/mureev/actions/workflows/production.yml/badge.svg)](https://github.com/mureev/mureev/actions/workflows/production.yml)
 
-My personal site. It's a terminal.
+My personal site. It's a terminal — not a page in a terminal costume, a
+login session. Type `help`. You were going to anyway.
 
 ```
 constantine@mureev.com:~$ whoami
@@ -24,46 +26,31 @@ constantine
 uid=2009(constantine) gid=42(engineering) groups=fintech,payments,mobile,teams,coffee
 ```
 
-### The story
+![The terminal, just booted: the CM logo, the greeting, a blinking prompt](.github/terminal.png)
 
-The 2017 version of this site was a jQuery Terminal page — a fine joke,
-told with 300 KB of other people's JavaScript pulled off a CDN. In 2026 the
-joke got better: the terminal is now **hand-rolled in vanilla JS, zero
-runtime dependencies, one self-contained file, no build step**, held to a
-size budget by its own tests, and View Source is part of the product.
+### Why a terminal
 
-It is also an **AI-based project**: the owner directs, AI agents build.
-[AGENTS.md](AGENTS.md) is the contract they work to, and the tests enforce
-the parts of it a machine can check. The site ships an
-[`/llms.txt`](content/llms.txt) briefing for agents that come crawling.
+The obvious objection to a personal site that pretends to be a terminal is
+that it's a gimmick, and the 2017 version was one: jQuery Terminal, 300 KB
+of other people's JavaScript doing an impression of a shell. It was a fine
+joke as long as nobody opened the Network tab. The 2026 version is the same
+joke taken seriously. History walks the way readline walks it, with the
+half-typed line kept and given back. Tab completes, and lists when it
+can't. `^C` prints `^C`. A paste runs line by line. The motd prints where a
+login prints it, and `uptime` has load averages. None of this means
+anything to someone who has never used a terminal, which is the point.
+It's a handshake, and a handshake has to be done right.
 
-### The rules
+The whole thing is one file, 14 KB gzipped, one round trip. There is no
+build step, so what View Source shows is the file in this repo, byte for
+byte. It has eleven commands and five themes; the list of what it doesn't
+have is longer, and was argued over harder. The size, the one file and the
+live site are checked by tests every morning, which is the only mention
+the tests will get here.
 
-The full contract lives in [AGENTS.md](AGENTS.md). The short version:
-
-1. One self-contained `index.html`. No build step, ever.
-2. Zero runtime dependencies — enforced by a test that fails on any `<script src>`.
-3. Size budget ≤ 48 KB raw / ≤ 14 KB gzipped — also a test.
-4. Functional core, imperative shell — the pure logic runs headless in `node:vm`.
-5. The copy is the owner's voice. The Mandalorian stays.
-
-### What checks it
-
-A promise nobody checks is a wish. Each of these has a check behind it,
-and a red build when it stops being true:
-
-| Promise | Checked by |
-| --- | --- |
-| One file, nothing loaded from elsewhere | unit: no `<script src>` or stylesheet link on any page · e2e: no request leaves the site but the gif |
-| ≤ 48 KB raw, ≤ 14 KB gzipped | unit: the size budget |
-| A pure core | unit: the core runs in a bare `node:vm` — no DOM to reach for |
-| Strangers' input can't break it | unit: a table of hostile input against every command, thousands of seeded lines, a history walked ten thousand times |
-| Nothing runs that didn't ship | unit: each page's CSP is exactly its inline code's hashes · e2e: not one CSP or Trusted Types violation, on any page |
-| Readable in every theme | unit: WCAG AA contrast, measured from the CSS itself |
-| Usable by keyboard and screen reader | e2e: the Tab walk, focus rings, landmarks, what the live region announces |
-| Fine without JavaScript, and on a phone | e2e: the no-JS fallback · a touch viewport: the boot, taps, the on-screen keyboard |
-| What ships is what was tested | CI: one image, smoke-tested and run through the e2e suite, then published |
-| The live site stays that way | daily: the e2e suite against mureev.com, plus certificates and the CVs |
+I direct, agents build. [AGENTS.md](AGENTS.md) is the contract they work
+to; the tests hold the parts of it a machine can check. There's a
+[`/llms.txt`](content/llms.txt) for the agents that come crawling.
 
 ### Run it
 
