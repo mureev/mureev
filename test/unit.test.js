@@ -526,13 +526,19 @@ test('no page loads anything from elsewhere (every content/*.html)', () => {
         ok(!/<script[^>]*\ssrc=|<link[^>]*rel=["']?stylesheet/i.test(page), f + ' loads an external script or stylesheet');
     }
 });
-test('contact facts agree: LINKS = no-JS fallback = llms.txt', () => {
+test('contact facts agree: LINKS = no-JS fallback = llms.txt = index.txt (what curl gets)', () => {
     const llms = fs.readFileSync(path.join(CONTENT, 'llms.txt'), 'utf8');
+    const text = fs.readFileSync(path.join(CONTENT, 'index.txt'), 'utf8');
     const fallback = html.slice(html.indexOf('<main id="fallback">'), html.indexOf('</main>'));
     for (const k of ['email', 'linkedin', 'telegram', 'messenger', 'cvEn', 'cvRu']) {
         ok(fallback.includes(csh.LINKS[k]), k + ' missing from #fallback');
         ok(llms.includes(csh.LINKS[k].replace(/^mailto:/, '')), k + ' missing from llms.txt');
+        ok(text.includes(csh.LINKS[k].replace(/^mailto:/, '')), k + ' missing from index.txt');
     }
+    const prose = text.replace(/ <https?:[^>]+>/g, '');         // links are written as `name <url>`
+    for (const l of csh.GREETING.map(textOf).filter((l) => l && !l.startsWith('Type ')))
+        ok(prose.includes(l), 'index.txt lacks the greeting line: ' + l);
+    ok(text.includes(csh.LOGO) && text.includes(csh.PS1), 'index.txt is not the session: logo and prompt');
 });
 test('the GitHub profile intro (top of README.md) names what the greeting links to', () => {
     const readme = fs.readFileSync(path.join(ROOT, 'README.md'), 'utf8');

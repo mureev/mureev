@@ -102,6 +102,7 @@ earning its place — and runs the e2e suite again against the container.
 | `content/index.html` | the site — markup, styles, and the `csh` engine |
 | `content/404.html`, `50x.html` | error pages, self-contained, zero JS |
 | `content/llms.txt` | briefing for AI agents |
+| `content/index.txt` | what `curl mureev.com` gets: the session, as text |
 | `content/.well-known/security.txt` | where to report a vulnerability ([RFC 9116](https://www.rfc-editor.org/rfc/rfc9116)) |
 | `conf/` | nginx, and the response headers (note the X-Clacks-Overhead) |
 | `test/` | unit + e2e suites |

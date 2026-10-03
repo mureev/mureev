@@ -51,10 +51,11 @@ build.
    purpose, so a change touches every copy: `LINKS`, `GREETING` and the
    command bodies in the core (incl. `neofetch`'s spec sheet), the `<head>`
    (title, description, OG, JSON-LD), the no-JS `#fallback`, `llms.txt`,
-   the contact in `.well-known/security.txt`, the card in `assets/og.png`
-   (regenerate with `tools/make_og.py`), and the profile intro at the top of
-   `README.md` — it is the owner's GitHub profile. The unit suite holds
-   `#fallback`, `llms.txt`, the JSON-LD, `security.txt` and the README intro
+   `index.txt` (the session as text, for curl), the contact in
+   `.well-known/security.txt`, the card in `assets/og.png` (regenerate with
+   `tools/make_og.py`), and the profile intro at the top of `README.md` — it
+   is the owner's GitHub profile. The unit suite holds `#fallback`,
+   `llms.txt`, `index.txt`, the JSON-LD, `security.txt` and the README intro
    to `LINKS` and the greeting; the rest of the `<head>` and `og.png` are on
    you.
 7. **Everything user-visible gets a test.** Core change → unit test. Behavior
@@ -67,11 +68,12 @@ content/
   index.html                the site: markup, styles, and the csh engine (core + shell)
   404.html, 50x.html        terminal-styled, self-contained, zero JS
   llms.txt                  briefing for AI agents crawling the site
+  index.txt                 the session as text: what curl, wget and HTTPie get for /
   robots.txt                points them at llms.txt
   .well-known/security.txt  where to report a vulnerability (RFC 9116)
   assets/                   og.png; CV/ is mounted in production, never committed
 conf/
-  default.conf              nginx: static files, caching, CORS (legacy, leave it), 404/50x
+  default.conf              nginx: static files, caching, text for shells, CORS (legacy, leave it), 404/50x
   security-headers.inc      the response headers, declared once (see the nginx note)
 Dockerfile                  pinned nginx + conf + content, file modes normalized
 test/

@@ -626,6 +626,11 @@ if (SERVED) section('served like production  (' + SITE + ')', null, async () => 
     const slash = await http.get('/assets');
     check('the trailing-slash redirect stays relative (so on https behind the proxy)',
         slash.status() === 301 && slash.headers().location === '/assets/', slash.status() + ' → ' + slash.headers().location);
+    const shell = await http.get('/', { headers: { 'user-agent': 'curl/8.7.1' } });
+    check('a shell asking gets a shell\'s answer: curl sees the session as text, with the same headers',
+        shell.headers()['content-type'] === 'text/plain; charset=utf-8' && (await shell.text()).includes("G'day, I'm Constantine Mureev.") &&
+        JSON.stringify(sent(shell, 'x-clacks-overhead')) === '["GNU Terry Pratchett"]' && !sent(shell, 'content-security-policy').length,
+        shell.headers()['content-type']);
     await http.dispose();
 });
 
