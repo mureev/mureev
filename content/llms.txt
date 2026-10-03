@@ -20,7 +20,6 @@ boots into a terminal at https://mureev.com/ — the facts are the same.
 - Email: constantine@mureev.com
 - LinkedIn: https://www.linkedin.com/in/mureev/
 - Telegram: https://t.me/mureev
-- Messenger: https://m.me/mureev
 - GitHub: https://github.com/mureev
 
 ## Documents

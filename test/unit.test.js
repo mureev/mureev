@@ -171,10 +171,10 @@ test('about keeps the owner\'s line intact', () => {
     ok(allText(csh.dispatch('about', CTX()))
         .includes('building teams, fintech, and great coffee'));
 });
-test('contacts carries all four channels as links', () => {
+test('contacts carries all three channels as links', () => {
     const parts = csh.dispatch('contacts', CTX())[0].ln.filter((p) => p.a);
     eq(parts.map((p) => p.a),
-        [csh.LINKS.email, csh.LINKS.linkedin, csh.LINKS.telegram, csh.LINKS.messenger]);
+        [csh.LINKS.email, csh.LINKS.linkedin, csh.LINKS.telegram]);
 });
 test('cv links both PDFs', () => {
     const hrefs = csh.dispatch('cv', CTX())[0].ln.filter((p) => p.a).map((p) => p.a);
@@ -413,7 +413,7 @@ test('JSON-LD parses and says what the terminal says', () => {
     eq(ld.email, csh.LINKS.email);
     eq(ld.jobTitle, role, 'jobTitle ≠ the spec sheet Role');
     eq(ld.worksFor.url, csh.LINKS.renmoney);
-    for (const k of ['linkedin', 'telegram', 'messenger'])
+    for (const k of ['linkedin', 'telegram'])
         ok(ld.sameAs.includes(csh.LINKS[k]), k + ' missing from sameAs');
 });
 
@@ -530,7 +530,7 @@ test('contact facts agree: LINKS = no-JS fallback = llms.txt = index.txt (what c
     const llms = fs.readFileSync(path.join(CONTENT, 'llms.txt'), 'utf8');
     const text = fs.readFileSync(path.join(CONTENT, 'index.txt'), 'utf8');
     const fallback = html.slice(html.indexOf('<main id="fallback">'), html.indexOf('</main>'));
-    for (const k of ['email', 'linkedin', 'telegram', 'messenger', 'cvEn', 'cvRu']) {
+    for (const k of ['email', 'linkedin', 'telegram', 'cvEn', 'cvRu']) {
         ok(fallback.includes(csh.LINKS[k]), k + ' missing from #fallback');
         ok(llms.includes(csh.LINKS[k].replace(/^mailto:/, '')), k + ' missing from llms.txt');
         ok(text.includes(csh.LINKS[k].replace(/^mailto:/, '')), k + ' missing from index.txt');

@@ -21,7 +21,7 @@
     <!-- Only this file's own code runs here: each inline <script> and <style>
          is allowed by its sha256, and no string becomes markup (Trusted Types).
          Edit one, and the unit suite prints this tag's new policy. -->
-    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IpWjq/CNuxLmxwsD5hiu6+6lFWLUNvg4vf8em+wm5u4=' 'sha256-LnuQPkcKpynPCDUO50iiNyN/HNc1ofORS5Pgcn2Deg8='; style-src 'sha256-eqPT3sKuMfHYOsHEZ3+5HGxV9HSdwindRpK+m5vOQLA='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
+    <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-IpWjq/CNuxLmxwsD5hiu6+6lFWLUNvg4vf8em+wm5u4=' 'sha256-/2hB/ghPyqtt31WgON5Y00ioA7MP8Ex0IKSOgWCOfMQ='; style-src 'sha256-eqPT3sKuMfHYOsHEZ3+5HGxV9HSdwindRpK+m5vOQLA='; img-src 'self' https://media1.giphy.com; base-uri 'none'; form-action 'none'; require-trusted-types-for 'script'; trusted-types 'none'">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, interactive-widget=resizes-content">
     <meta name="color-scheme" content="dark">
     <meta name="theme-color" content="#0a0e0b">
@@ -62,7 +62,6 @@
       "sameAs": [
         "https://www.linkedin.com/in/mureev/",
         "https://t.me/mureev",
-        "https://m.me/mureev",
         "https://github.com/mureev"
       ]
     }
@@ -259,8 +258,7 @@
         <ul>
             <li><a href="mailto:constantine@mureev.com">constantine@mureev.com</a></li>
             <li><a href="https://www.linkedin.com/in/mureev/">LinkedIn</a> ·
-                <a href="https://t.me/mureev">Telegram</a> ·
-                <a href="https://m.me/mureev">Messenger</a></li>
+                <a href="https://t.me/mureev">Telegram</a></li>
         </ul>
         <div class="gap"></div>
         <p><span class="ps1">constantine@mureev.com:~$ </span>cv</p>
@@ -327,7 +325,6 @@
         email:     'mailto:constantine@mureev.com',
         linkedin:  'https://www.linkedin.com/in/mureev/',
         telegram:  'https://t.me/mureev',
-        messenger: 'https://m.me/mureev',
         renmoney:  'https://renmoney.com',
         cvEn:      'https://mureev.com/assets/CV/Constantine%20Mureev.pdf',
         cvRu:      'https://mureev.com/assets/CV/%D0%9A%D0%BE%D0%BD%D1%81%D1%82%D0%B0%D0%BD%D1%82%D0%B8%D0%BD%20%D0%9C%D1%83%D1%80%D0%B5%D0%B5%D0%B2.pdf',
@@ -488,8 +485,7 @@
             d: 'how to reach me',
             run: () => [{ ln: ['Email me at ', { t: 'constantine@mureev.com', a: LINKS.email },
                 ', connect on ', { t: 'LinkedIn', a: LINKS.linkedin },
-                ', or IM me in ', { t: 'Telegram', a: LINKS.telegram },
-                ' and ', { t: 'Messenger', a: LINKS.messenger }] }]
+                ', or IM me in ', { t: 'Telegram', a: LINKS.telegram }] }]
         },
         cv: {
             d: 'the PDF, in EN and RU',
@@ -501,8 +497,7 @@
             run: () => [{ ln: [
                 'Email: ', { t: 'constantine@mureev.com', a: LINKS.email },
                 ' | LinkedIn: ', { t: 'mureev', a: LINKS.linkedin },
-                ' | Telegram: ', { t: '@mureev', a: LINKS.telegram },
-                ' | Messenger: ', { t: 'mureev', a: LINKS.messenger }] }]
+                ' | Telegram: ', { t: '@mureev', a: LINKS.telegram }] }]
         },
         whoami: {
             d: 'identity check',

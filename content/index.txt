@@ -14,7 +14,7 @@ Ready to chat?
 
 constantine@mureev.com:~$ contacts
 Email me at constantine@mureev.com, connect on LinkedIn <https://www.linkedin.com/in/mureev/>,
-or IM me in Telegram <https://t.me/mureev> and Messenger <https://m.me/mureev>
+or IM me in Telegram <https://t.me/mureev>
 constantine@mureev.com:~$ cv
 English: https://mureev.com/assets/CV/Constantine%20Mureev.pdf
 Russian: https://mureev.com/assets/CV/%D0%9A%D0%BE%D0%BD%D1%81%D1%82%D0%B0%D0%BD%D1%82%D0%B8%D0%BD%20%D0%9C%D1%83%D1%80%D0%B5%D0%B5%D0%B2.pdf
