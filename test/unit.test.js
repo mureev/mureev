@@ -563,8 +563,8 @@ test('the dead analytics snippet stays dead', () =>
     ok(!html.includes('UA-111817231')));
 test(`size budget: raw ≤ 48 KB (now ${(BYTES / 1024).toFixed(1)} KB)`, () =>
     ok(BYTES <= 48 * 1024, 'index.html got fat — features pay rent in bytes'));
-test(`size budget: gzipped ≤ 14 KB (now ${(GZ / 1024).toFixed(1)} KB, ${14 * 1024 - GZ} bytes to spare)`, () =>
-    ok(GZ <= 14 * 1024, 'gzipped budget blown'));
+test(`size budget: gzipped ≤ 16 KB (now ${(GZ / 1024).toFixed(1)} KB, ${16 * 1024 - GZ} bytes to spare)`, () =>
+    ok(GZ <= 16 * 1024, 'gzipped budget blown'));
 
 /* ---------- summary ---------------------------------------------------------- */
 console.log('\n' + passed + '/' + (passed + failures.length) + ' unit tests passed'

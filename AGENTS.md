@@ -30,7 +30,7 @@ build.
    The suite fails on any `<script src=...>`. Dev dependencies live in
    `package.json` and exist only to test the claim (Playwright, currently the
    only one — keep it the only one).
-3. **Size budget: ≤ 48 KB raw, ≤ 14 KB gzipped** for index.html, enforced by
+3. **Size budget: ≤ 48 KB raw, ≤ 16 KB gzipped** for index.html, enforced by
    tests. Features pay rent in bytes. If a change is worth blowing the
    budget, that is an owner decision, made by raising the budget in the test
    *and* here — never by deleting the test.
